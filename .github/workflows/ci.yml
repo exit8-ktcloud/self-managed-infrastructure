@@ -107,7 +107,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Backend Spring
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./services/backend-spring
           push: false
@@ -116,14 +116,14 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build Backend Python
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./services/backend-python
           push: false
           tags: exit8/backend-python:test
 
       - name: Build Frontend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ./services/frontend
           push: false
