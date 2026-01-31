@@ -48,10 +48,10 @@ exit8/
 ├── services/
 │   ├── service-a/          # Spring Boot + React (통합 서비스)
 │   │   ├── backend/        # Java 17
-│   │   └── frontend/       # React + Vite
+│   │   └── frontend/       # React
 │   ├── service-b/          # FastAPI + React (통합 서비스)
 │   │   ├── backend/        # Python 3.11
-│   │   └── frontend/       # React + Vite
+│   │   └── frontend/       # React
 │   ├── npm/                # Nginx Proxy Manager 설정
 │   ├── vault/              # HashiCorp Vault
 │   ├── wazuh/              # Wazuh SIEM
@@ -121,8 +121,7 @@ docker-compose -f services/wazuh/docker-compose.wazuh.yml up -d
 
 | Workflow | Trigger | 설명 |
 |----------|---------|------|
-| CI | push, PR | 빌드, 테스트, Docker 빌드 검증 |
-| CD | main push | 이미지 빌드 → GHCR 푸시 → 서버 배포 |
+| Deploy | main push | 변경 서비스 감지 → Docker 이미지 빌드 → Docker Hub 푸시 → SSH 접속 후 변경분 Pull 및 배포 → 헬스체크 |
 | Security | main, weekly | 의존성 취약점, 컨테이너, 시크릿 스캔 |
 
 **배포 시 필요한 GitHub Secrets:**
