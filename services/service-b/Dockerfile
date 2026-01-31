@@ -2,7 +2,7 @@
 # Service B: FastAPI Backend
 # ==========================================
 
-FROM python:3.11-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 # Install system dependencies
