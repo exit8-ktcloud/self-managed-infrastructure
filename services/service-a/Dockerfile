@@ -3,13 +3,13 @@
 # ==========================================
 
 # Stage 1: Build Backend
-FROM eclipse-temurin:17-jdk-alpine AS backend-build
+FROM eclipse-temurin:25-jdk-alpine AS backend-build
 WORKDIR /app
 COPY backend/ ./
 RUN chmod +x gradlew && ./gradlew bootJar --no-daemon
 
 # Stage 2: Production Image
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 # Copy backend JAR
