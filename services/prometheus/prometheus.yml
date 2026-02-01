@@ -8,17 +8,17 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # Backend Spring (Actuator)
-  - job_name: 'backend-spring'
+  # Service A (Spring) 
+  - job_name: 'service-a'
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ['backend-spring:8080']
+      - targets: ['service-a:8080']
 
-  # Backend Python (FastAPI)
-  - job_name: 'backend-python'
+  # Service B (FastAPI)
+  - job_name: 'service-b'
     metrics_path: /metrics
     static_configs:
-      - targets: ['backend-python:8000']
+      - targets: ['service-b:8000']
 
   # PostgreSQL (via exporter)
   - job_name: 'postgres'
