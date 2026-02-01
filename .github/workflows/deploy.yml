@@ -4,8 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'services/service-a/**'
-      - 'services/service-b/**'
+      - 'services/**'
       - 'docker-compose.yml'
       - '.github/workflows/deploy.yml'
 
@@ -22,6 +21,8 @@ jobs:
     outputs:
       service-a: ${{ steps.changes.outputs.service-a }}
       service-b: ${{ steps.changes.outputs.service-b }}
+      infra: ${{ steps.changes.outputs.infra }}
+      changed-infra-services: ${{ steps.changes.outputs.changed-infra-services }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,19 +36,63 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED"
 
-          # Check service-a
+          # Check service-a (모든 파일 변경 감지)
           if echo "$CHANGED" | grep -q "^services/service-a/"; then
             echo "service-a=true" >> $GITHUB_OUTPUT
           else
             echo "service-a=false" >> $GITHUB_OUTPUT
           fi
 
-          # Check service-b
+          # Check service-b (모든 파일 변경 감지)
           if echo "$CHANGED" | grep -q "^services/service-b/"; then
             echo "service-b=true" >> $GITHUB_OUTPUT
           else
             echo "service-b=false" >> $GITHUB_OUTPUT
           fi
+
+          # Check infra services (npm, vault, prometheus, grafana, wazuh)
+          INFRA_CHANGED="false"
+          CHANGED_SERVICES=""
+
+          # Check npm
+          if echo "$CHANGED" | grep -qE "^services/npm/(Dockerfile|.*\.(yml|yaml|conf|json|hcl)$|config/|custom/)"; then
+            INFRA_CHANGED="true"
+            CHANGED_SERVICES="${CHANGED_SERVICES}nginx-proxy-manager,"
+          fi
+
+          # Check vault
+          if echo "$CHANGED" | grep -qE "^services/vault/(Dockerfile|.*\.(yml|yaml|conf|json|hcl)$|config/)"; then
+            INFRA_CHANGED="true"
+            CHANGED_SERVICES="${CHANGED_SERVICES}vault,"
+          fi
+
+          # Check prometheus
+          if echo "$CHANGED" | grep -qE "^services/prometheus/(Dockerfile|.*\.(yml|yaml|conf|json|hcl)$|config/)"; then
+            INFRA_CHANGED="true"
+            CHANGED_SERVICES="${CHANGED_SERVICES}prometheus,"
+          fi
+
+          # Check grafana
+          if echo "$CHANGED" | grep -qE "^services/grafana/(Dockerfile|.*\.(yml|yaml|conf|json|hcl)$|config/|provisioning/|dashboards/)"; then
+            INFRA_CHANGED="true"
+            CHANGED_SERVICES="${CHANGED_SERVICES}grafana,"
+          fi
+
+          # Check wazuh
+          if echo "$CHANGED" | grep -qE "^services/wazuh/(Dockerfile|.*\.(yml|yaml|conf|json|hcl)$|config/)"; then
+            INFRA_CHANGED="true"
+            CHANGED_SERVICES="${CHANGED_SERVICES}wazuh,"
+          fi
+
+          # Check docker-compose.yml changes
+          if echo "$CHANGED" | grep -q "^docker-compose.yml$"; then
+            INFRA_CHANGED="true"
+          fi
+
+          echo "infra=${INFRA_CHANGED}" >> $GITHUB_OUTPUT
+          echo "changed-infra-services=${CHANGED_SERVICES%,}" >> $GITHUB_OUTPUT
+          echo "Infra changed: ${INFRA_CHANGED}"
+          echo "Changed infra services: ${CHANGED_SERVICES%,}"
 
   # ====================
   # Build & Push Service A
@@ -138,36 +183,69 @@ jobs:
     name: Deploy to Server
     runs-on: ubuntu-latest
     needs: [detect-changes, build-service-a, build-service-b]
+    # always() 필수: skipped된 job도 통과시키기 위함
+    # build job이 성공 또는 skipped여야 하고, 최소 하나의 서비스가 변경되어야 함
     if: |
       always() &&
+      !cancelled() &&
       (needs.build-service-a.result == 'success' || needs.build-service-a.result == 'skipped') &&
       (needs.build-service-b.result == 'success' || needs.build-service-b.result == 'skipped') &&
-      (needs.detect-changes.outputs.service-a == 'true' || needs.detect-changes.outputs.service-b == 'true')
+      (needs.detect-changes.outputs.service-a == 'true' || needs.detect-changes.outputs.service-b == 'true' || needs.detect-changes.outputs.infra == 'true')
     environment: production
 
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          SERVICE_A_CHANGED: ${{ needs.detect-changes.outputs.service-a }}
+          SERVICE_B_CHANGED: ${{ needs.detect-changes.outputs.service-b }}
+          INFRA_CHANGED: ${{ needs.detect-changes.outputs.infra }}
+          CHANGED_INFRA_SERVICES: ${{ needs.detect-changes.outputs.changed-infra-services }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: SERVICE_A_CHANGED,SERVICE_B_CHANGED,INFRA_CHANGED,CHANGED_INFRA_SERVICES
           script: |
             cd /opt/exit8
 
-            # Pull only changed services
-            if [ "${{ needs.detect-changes.outputs.service-a }}" == "true" ]; then
+            # Pull latest code
+            git pull origin main
+
+            # Build list of services to update
+            SERVICES_TO_UPDATE=""
+
+            # Pull and add application services
+            if [ "$SERVICE_A_CHANGED" == "true" ]; then
               echo "Pulling service-a..."
               docker pull exit8/service-a:latest
+              SERVICES_TO_UPDATE="${SERVICES_TO_UPDATE} service-a"
             fi
 
-            if [ "${{ needs.detect-changes.outputs.service-b }}" == "true" ]; then
+            if [ "$SERVICE_B_CHANGED" == "true" ]; then
               echo "Pulling service-b..."
               docker pull exit8/service-b:latest
+              SERVICES_TO_UPDATE="${SERVICES_TO_UPDATE} service-b"
             fi
 
-            # Restart services with zero-downtime
-            docker-compose up -d --remove-orphans
+            # Add changed infra services
+            if [ "$INFRA_CHANGED" == "true" ] && [ -n "$CHANGED_INFRA_SERVICES" ]; then
+              echo "Changed infra services: $CHANGED_INFRA_SERVICES"
+              # Convert comma-separated to space-separated
+              INFRA_SERVICES=$(echo "$CHANGED_INFRA_SERVICES" | tr ',' ' ')
+              SERVICES_TO_UPDATE="${SERVICES_TO_UPDATE} ${INFRA_SERVICES}"
+            fi
+
+            # Trim leading/trailing whitespace
+            SERVICES_TO_UPDATE=$(echo "$SERVICES_TO_UPDATE" | xargs)
+
+            if [ -n "$SERVICES_TO_UPDATE" ]; then
+              echo "Updating services: $SERVICES_TO_UPDATE"
+              # Selectively rebuild and restart only changed services
+              docker-compose up -d --build --no-deps $SERVICES_TO_UPDATE
+            else
+              echo "No services to update"
+            fi
 
             # Cleanup old images
             docker image prune -f
@@ -175,12 +253,15 @@ jobs:
             # Health check
             sleep 10
 
-            if [ "${{ needs.detect-changes.outputs.service-a }}" == "true" ]; then
+            if [ "$SERVICE_A_CHANGED" == "true" ]; then
+              echo "Health check for service-a..."
               curl -f http://localhost:8080/health || exit 1
             fi
 
-            if [ "${{ needs.detect-changes.outputs.service-b }}" == "true" ]; then
+            if [ "$SERVICE_B_CHANGED" == "true" ]; then
+              echo "Health check for service-b..."
               curl -f http://localhost:8000/health || exit 1
             fi
 
             echo "Deployment completed successfully"
+            echo "Updated services: $SERVICES_TO_UPDATE"
