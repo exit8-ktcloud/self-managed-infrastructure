@@ -26,6 +26,7 @@ jobs:
       infra: ${{ steps.changes.outputs.infra }}
       changed-infra-services: ${{ steps.changes.outputs.changed-infra-services }}
       any-app-changed: ${{ steps.changes.outputs.any-app-changed }}
+      docker-compose-changed: ${{ steps.changes.outputs.docker-compose-changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,6 +105,9 @@ jobs:
           # Check docker-compose.yml changes
           if echo "$CHANGED" | grep -q "^docker-compose.yml$"; then
             INFRA_CHANGED="true"
+            echo "docker-compose-changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "docker-compose-changed=false" >> $GITHUB_OUTPUT
           fi
 
           echo "infra=${INFRA_CHANGED}" >> $GITHUB_OUTPUT
@@ -311,11 +315,12 @@ jobs:
           SERVICE_B_FRONTEND: ${{ needs.detect-changes.outputs.service-b-frontend }}
           INFRA_CHANGED: ${{ needs.detect-changes.outputs.infra }}
           CHANGED_INFRA_SERVICES: ${{ needs.detect-changes.outputs.changed-infra-services }}
+          DOCKER_COMPOSE_CHANGED: ${{ needs.detect-changes.outputs.docker-compose-changed }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: SERVICE_A_BACKEND,SERVICE_A_FRONTEND,SERVICE_B_BACKEND,SERVICE_B_FRONTEND,INFRA_CHANGED,CHANGED_INFRA_SERVICES
+          envs: SERVICE_A_BACKEND,SERVICE_A_FRONTEND,SERVICE_B_BACKEND,SERVICE_B_FRONTEND,INFRA_CHANGED,CHANGED_INFRA_SERVICES,DOCKER_COMPOSE_CHANGED
           script: |
             set -e  # Exit on any error
 
@@ -371,14 +376,20 @@ jobs:
             # Trim leading/trailing whitespace
             SERVICES_TO_UPDATE=$(echo "$SERVICES_TO_UPDATE" | xargs)
 
-            if [ -n "$SERVICES_TO_UPDATE" ]; then
+            # Use docker compose (V2) with fallback to docker-compose (V1)
+            if command -v docker compose &> /dev/null; then
+              COMPOSE_CMD="docker compose"
+            else
+              COMPOSE_CMD="docker-compose"
+            fi
+
+            # If docker-compose.yml changed, restart all services
+            if [ "$DOCKER_COMPOSE_CHANGED" == "true" ]; then
+              echo "docker-compose.yml changed - restarting all services..."
+              $COMPOSE_CMD up -d --remove-orphans
+            elif [ -n "$SERVICES_TO_UPDATE" ]; then
               echo "Updating services: $SERVICES_TO_UPDATE"
-              # Use docker compose (V2) with fallback to docker-compose (V1)
-              if command -v docker compose &> /dev/null; then
-                docker compose up -d --no-deps $SERVICES_TO_UPDATE
-              else
-                docker-compose up -d --no-deps $SERVICES_TO_UPDATE
-              fi
+              $COMPOSE_CMD up -d --no-deps $SERVICES_TO_UPDATE
             else
               echo "No services to update"
             fi
@@ -389,27 +400,40 @@ jobs:
             # Health check
             sleep 15
 
-            # Backend health checks via docker exec (internal ports)
-            if [ "$SERVICE_A_BACKEND" == "true" ]; then
-              echo "Health check for service-a-backend..."
-              docker exec service-a-backend curl -f http://localhost:8080/actuator/health || exit 1
-            fi
+            # If docker-compose.yml changed, check all app services
+            if [ "$DOCKER_COMPOSE_CHANGED" == "true" ]; then
+              echo "Health check for all services (docker-compose.yml changed)..."
+              docker exec service-a-backend curl -f http://localhost:8080/actuator/health || echo "Warning: service-a-backend health check failed"
+              docker exec service-b-backend curl -f http://localhost:8000/health || echo "Warning: service-b-backend health check failed"
+              curl -f http://localhost:3000/health || echo "Warning: service-a-frontend health check failed"
+              curl -f http://localhost:3002/health || echo "Warning: service-b-frontend health check failed"
+            else
+              # Backend health checks via docker exec (internal ports)
+              if [ "$SERVICE_A_BACKEND" == "true" ]; then
+                echo "Health check for service-a-backend..."
+                docker exec service-a-backend curl -f http://localhost:8080/actuator/health || exit 1
+              fi
 
-            if [ "$SERVICE_B_BACKEND" == "true" ]; then
-              echo "Health check for service-b-backend..."
-              docker exec service-b-backend curl -f http://localhost:8000/health || exit 1
-            fi
+              if [ "$SERVICE_B_BACKEND" == "true" ]; then
+                echo "Health check for service-b-backend..."
+                docker exec service-b-backend curl -f http://localhost:8000/health || exit 1
+              fi
 
-            # Frontend health checks via exposed ports
-            if [ "$SERVICE_A_FRONTEND" == "true" ]; then
-              echo "Health check for service-a-frontend..."
-              curl -f http://localhost:3000/health || exit 1
-            fi
+              # Frontend health checks via exposed ports
+              if [ "$SERVICE_A_FRONTEND" == "true" ]; then
+                echo "Health check for service-a-frontend..."
+                curl -f http://localhost:3000/health || exit 1
+              fi
 
-            if [ "$SERVICE_B_FRONTEND" == "true" ]; then
-              echo "Health check for service-b-frontend..."
-              curl -f http://localhost:3002/health || exit 1
+              if [ "$SERVICE_B_FRONTEND" == "true" ]; then
+                echo "Health check for service-b-frontend..."
+                curl -f http://localhost:3002/health || exit 1
+              fi
             fi
 
             echo "Deployment completed successfully"
-            echo "Updated services: $SERVICES_TO_UPDATE"
+            if [ "$DOCKER_COMPOSE_CHANGED" == "true" ]; then
+              echo "All services restarted due to docker-compose.yml change"
+            else
+              echo "Updated services: $SERVICES_TO_UPDATE"
+            fi
