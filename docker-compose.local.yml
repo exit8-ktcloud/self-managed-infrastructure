@@ -48,16 +48,18 @@ services:
       retries: 5
 
   # =================
-  # 애플리케이션 레이어 (로컬 빌드)
+  # 애플리케이션 레이어 (분리된 서비스 - 로컬 빌드)
   # =================
-  service-a:
+
+  # Service A - Backend (Spring Boot)
+  service-a-backend:
     build:
-      context: ./services/service-a
+      context: ./services/service-a/backend
       dockerfile: Dockerfile
-    container_name: service-a
+    container_name: service-a-backend
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8080:8080"  # 로컬에서는 직접 접근 가능하도록 포트 노출
     environment:
       JAVA_OPTS: "-Xms128m -Xmx256m"
     networks:
@@ -68,19 +70,40 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  service-b:
+  # Service A - Frontend (Nginx)
+  service-a-frontend:
     build:
-      context: ./services/service-b
+      context: ./services/service-a/frontend
       dockerfile: Dockerfile
-    container_name: service-b
+    container_name: service-a-frontend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "3000:80"
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      - service-a-backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Service B - Backend (FastAPI)
+  service-b-backend:
+    build:
+      context: ./services/service-b/backend
+      dockerfile: Dockerfile
+    container_name: service-b-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"  # 로컬에서는 직접 접근 가능하도록 포트 노출
     networks:
       - backend
     depends_on:
@@ -94,7 +117,29 @@ services:
       timeout: 10s
       retries: 3
 
+  # Service B - Frontend (Nginx)
+  service-b-frontend:
+    build:
+      context: ./services/service-b/frontend
+      dockerfile: Dockerfile
+    container_name: service-b-frontend
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      - service-b-backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
+  frontend:
+    driver: bridge
   backend:
     driver: bridge
 
