@@ -52,60 +52,35 @@ jobs:
           severity: 'CRITICAL,HIGH'
 
   # ====================
-  # Container Scan
+  # Container Scan (Matrix - 병렬 실행)
   # ====================
   container-scan:
-    name: Container Image Scan
+    name: Container Scan - ${{ matrix.service }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false  # 하나 실패해도 나머지 계속 실행
+      matrix:
+        include:
+          - service: service-a-backend
+            context: ./services/service-a/backend
+          - service: service-a-frontend
+            context: ./services/service-a/frontend
+          - service: service-b-backend
+            context: ./services/service-b/backend
+          - service: service-b-frontend
+            context: ./services/service-b/frontend
 
     steps:
       - uses: actions/checkout@v4
 
-      # Service A Backend
-      - name: Build Service A Backend Image
+      - name: Build ${{ matrix.service }} Image
         run: |
-          docker build -t exit8/service-a-backend:scan ./services/service-a/backend
+          docker build -t exit8/${{ matrix.service }}:scan ${{ matrix.context }}
 
-      - name: Scan Service A Backend
+      - name: Scan ${{ matrix.service }}
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'exit8/service-a-backend:scan'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-
-      # Service A Frontend
-      - name: Build Service A Frontend Image
-        run: |
-          docker build -t exit8/service-a-frontend:scan ./services/service-a/frontend
-
-      - name: Scan Service A Frontend
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'exit8/service-a-frontend:scan'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-
-      # Service B Backend
-      - name: Build Service B Backend Image
-        run: |
-          docker build -t exit8/service-b-backend:scan ./services/service-b/backend
-
-      - name: Scan Service B Backend
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'exit8/service-b-backend:scan'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-
-      # Service B Frontend
-      - name: Build Service B Frontend Image
-        run: |
-          docker build -t exit8/service-b-frontend:scan ./services/service-b/frontend
-
-      - name: Scan Service B Frontend
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'exit8/service-b-frontend:scan'
+          image-ref: 'exit8/${{ matrix.service }}:scan'
           format: 'table'
           severity: 'CRITICAL,HIGH'
 

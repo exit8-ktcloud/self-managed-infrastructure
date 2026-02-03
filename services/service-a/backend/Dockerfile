@@ -14,9 +14,6 @@ RUN chmod +x gradlew
 
 RUN ./gradlew dependencies --no-daemon
 
-RUN groupadd -g 1001 appgroup && \
-    useradd -u 1001 -g appgroup -s /bin/bash appuser
-
 # 실제 소스
 COPY src src
 
@@ -25,17 +22,23 @@ RUN ./gradlew bootJar --no-daemon
 # ---------- runtime stage ----------
 FROM eclipse-temurin:17-jre-alpine
 
-USER appuser
-
 WORKDIR /app
 
+# 비root 사용자 생성 (Alpine 명령어 사용)
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -u 1001 -S appuser -G appgroup
+
+# curl 설치 (healthcheck용)
 RUN apk add --no-cache curl
+
+# Spring Boot bootJar 복사
+COPY --from=build --chown=appuser:appgroup /app/build/libs/*.jar app.jar
+
+# 비root 사용자로 전환
+USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:8080/actuator/health || exit 1
-
-# Spring Boot bootJar만 명시적으로 사용
-COPY --from=build /app/build/libs/*.jar app.jar
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
