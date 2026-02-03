@@ -14,6 +14,9 @@ RUN chmod +x gradlew
 
 RUN ./gradlew dependencies --no-daemon
 
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -s /bin/bash appuser
+
 # 실제 소스
 COPY src src
 
