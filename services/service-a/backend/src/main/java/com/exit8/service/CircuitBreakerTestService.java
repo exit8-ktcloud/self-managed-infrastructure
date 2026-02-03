@@ -1,7 +1,9 @@
 package com.exit8.service;
 
+import com.exit8.exception.ApiException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -21,9 +23,14 @@ public class CircuitBreakerTestService {
             return "OK";
 
         } catch (InterruptedException e) {
-            // 인터럽트 상태 복원 (중요)
+            // 인터럽트 상태 복원
             Thread.currentThread().interrupt();
-            throw new RuntimeException("THREAD_INTERRUPTED");
+
+            throw new ApiException(
+                    "THREAD_INTERRUPTED",
+                    "thread was interrupted during processing",
+                    HttpStatus.INTERNAL_SERVER_ERROR
+            );
         }
     }
 
@@ -37,6 +44,10 @@ public class CircuitBreakerTestService {
                 t.getMessage()
         );
 
-        throw new RuntimeException("CIRCUIT_OPEN");
+        throw new ApiException(
+                "CIRCUIT_OPEN",
+                "circuit breaker is open",
+                HttpStatus.SERVICE_UNAVAILABLE
+        );
     }
 }

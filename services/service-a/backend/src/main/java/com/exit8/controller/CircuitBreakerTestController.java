@@ -15,6 +15,6 @@ public class CircuitBreakerTestController {
     @GetMapping("/test")
     public DefaultResponse<String> test() {
         String result = circuitBreakerTestService.callWithDelay();
-        return DefaultResponse.success(result);
+        return DefaultResponse.success(200, result);
     }
 }

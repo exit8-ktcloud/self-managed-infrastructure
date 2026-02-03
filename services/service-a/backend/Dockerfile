@@ -22,6 +22,8 @@ RUN ./gradlew bootJar --no-daemon
 # ---------- runtime stage ----------
 FROM eclipse-temurin:17-jre-alpine
 
+USER appuser
+
 WORKDIR /app
 
 RUN apk add --no-cache curl

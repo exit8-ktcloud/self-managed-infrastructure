@@ -13,20 +13,20 @@ public class LoadScenarioController {
     private final LoadScenarioService loadScenarioService;
 
     @PostMapping("/cpu")
-    public DefaultResponse<Void> cpuLoad(@RequestParam int durationMs) {
+    public DefaultResponse<Void> cpuLoad(@RequestParam long durationMs) {
         loadScenarioService.generateCpuLoad(durationMs);
-        return DefaultResponse.success();
+        return DefaultResponse.success(200);
     }
 
     @PostMapping("/db-read")
     public DefaultResponse<Void> dbReadLoad(@RequestParam int repeatCount) {
         loadScenarioService.simulateDbReadLoad(repeatCount);
-        return DefaultResponse.success();
+        return DefaultResponse.success(200);
     }
 
     @PostMapping("/db-write")
     public DefaultResponse<Void> dbWrite(@RequestParam int repeatCount) {
         loadScenarioService.simulateDbWriteLoad(repeatCount);
-        return DefaultResponse.success();
+        return DefaultResponse.success(200);
     }
 }

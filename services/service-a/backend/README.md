@@ -120,8 +120,8 @@ SPRING_PROFILES_ACTIVE=local ./gradlew bootRun
 {service}:{app}:{resource}:{id}
 
 # 예시
-backend-spring:spring:load:cpu
-backend-spring:spring:health:status
+service-a-backend:spring:load:cpu
+service-a-backend:spring:health:status
 ```
 - 모든 Key는 TTL 필수
 - 실험용 Key는 test: prefix 사용
@@ -234,17 +234,20 @@ DOWN
 ## 9. 공통 응답 포맷
 ```
 {
-  "success": true,
+  "httpCode": 200,
   "data": {},
   "error": null
 }
 
 ```
+- httpCode : 실제 HTTP 상태 코드와 동일
+- data : 성공 시 결과 데이터 (없으면 null 또는 {})
+- error : 성공 시 항상 null
 
 에러 시:
 ```
 {
-  "success": false,
+  "httpCode": 500,
   "data": null,
   "error": {
     "code": "INVALID_PARAM",
@@ -252,6 +255,15 @@ DOWN
   }
 }
 ```
+- data : 에러 시 항상 null
+- error.code : 비즈니스 에러 코드 (고정 문자열)
+- error.message : 클라이언트 전달용 메시지
+
+| 상황                   | 분류             |
+| -------------------- | -------------- |
+| Circuit OPEN         | 503            |
+| DB 병목                | 200 + DEGRADED |
+| 잘못된 파라미터             | 400            |
 
 ---
 
@@ -346,17 +358,17 @@ docker run -d --name redis --network exit8-net -p 6379:6379 redis:7
 
 2. 이미지 빌드 (캐시 제거)
 ```
-docker build --no-cache -t backend-spring:test .
+docker build --no-cache -t service-a-backend:test .
 ```
 
 3.  실행
 ```
 docker run -d \
-  --name backend-spring \
+  --name service-a-backend \
   -p 8080:8080 \
   --network exit8-net \
   -e SPRING_PROFILES_ACTIVE=docker \
-  backend-spring:test
+  service-a-backend:test
 ```
 
 4. 확인
@@ -382,7 +394,7 @@ docker network connect exit8-net redis
 
 - backend 실행 (같은 네트워크)
 ```
-docker run --name backend-spring -p 8080:8080 --network exit8-net -e SPRING_PROFILES_ACTIVE=docker backend-spring:test
+docker run --name service-a-backend -p 8080:8080 --network exit8-net -e SPRING_PROFILES_ACTIVE=docker service-a-backend:test
 ```
 ---
 
