@@ -24,6 +24,11 @@ FROM eclipse-temurin:17-jre-alpine
 
 WORKDIR /app
 
+RUN apk add --no-cache curl
+
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:8080/actuator/health || exit 1
+
 # Spring Boot bootJar만 명시적으로 사용
 COPY --from=build /app/build/libs/*.jar app.jar
 

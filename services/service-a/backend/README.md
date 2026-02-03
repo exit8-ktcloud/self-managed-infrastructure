@@ -33,7 +33,7 @@
 
 ## 3. 디렉토리 구조
 ```
-services-a/backend/
+services/service-a/backend/
 ├── build.gradle
 ├── .env
 ├── src/main/java/com/exit8/
@@ -281,31 +281,63 @@ DOWN
 
 ## 11. Docker 기반 개발 환경
 
-- Spring Boot 애플리케이션 Docker 이미지화 (보류)
-  - `Dockerfile` 작성
-  - 빌드 단계와 실행 단계를 분리하여 **Multi-stage 빌드로 이미지 용량 최소화**
+### Spring Boot 애플리케이션 Docker 이미지화
+- Gradle 기반 Spring Boot 애플리케이션을 Docker 이미지로 패키징
+- 빌드 단계와 실행 단계를 분리한 **Multi-stage 빌드 적용으로 이미지 용량 최소화**
+- 최종 이미지에는 실행에 필요한 JAR 파일만 포함
+- Build Stage
+  - eclipse-temurin:17-jdk-alpine 기반
+  - Gradle Wrapper를 사용하여 애플리케이션 빌드
+- Runtime Stage
+  - 빌드 단계에서 생성된 JAR만 복사하여 실행
+  - curl을 설치하여 /actuator/health 기반 Docker Healthcheck 지원
+- Docker Healthcheck와 Spring Actuator를 연계한 컨테이너 생존 상태 확인 가능
 
-### PostgreSQL
+### Docker Healthcheck & Spring Actuator 설계 원칙
+- docker-compose를 수정하지 않는 것을 전제로 Spring Actuator Health 동작 설계
+- docker-compose Healthcheck는 /actuator/health 기준으로 HTTP 응답 가능 여부(Liveness) 만 판단
 ```
-docker run -d \
-  --name db-postgres \
-  -p 5432:5432 \
-  -e POSTGRES_DB=EXIT8 \
-  -e POSTGRES_USER=exit8 \
-  -e POSTGRES_PASSWORD=exit8pass \
-  postgres:16
+healthcheck:
+  test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/actuator/health"]
 ```
 
-### Redis
+### Docker 환경 Health 정책 (application-docker.yml)
 ```
-docker run -d \
-  --name db-redis \
-  -p 6379:6379 \
-  redis:7
+management:
+  health:
+    db:
+      enabled: false
+    redis:
+      enabled: false
+    circuitbreakers:
+      enabled: false
 ```
+- DB / Redis / CircuitBreaker 상태는 Health 판단에서 제외
+- 부하 테스트 중 의존성 장애가 발생해도 컨테이너 유지
+- restart loop 방지
+
+| 레이어             | Health 의미            |
+| --------------- | -------------------- |
+| Docker          | 프로세스 + HTTP 응답 여부    |
+| Spring (docker) | Liveness             |
+| 관측              | Prometheus / Grafana |
+
 
 ---
 ## 12. 로컬 Docker 테스트 절차
+
+### DB 컨테이너 실행
+- PostgreSQL
+```
+docker run -d --name postgres --network exit8-net -p 5432:5432 -e POSTGRES_DB=EXIT8 -e POSTGRES_USER=exit8 -e POSTGRES_PASSWORD=exit8pass postgres:16
+```
+
+- Redis
+```
+docker run -d --name redis --network exit8-net -p 6379:6379 redis:7
+```
+
+### SpringBoot 서버 도커라이징
 
 1. Gradle Wrapper를 제대로 생성해서 Git에 포함
 ```
@@ -344,8 +376,8 @@ docker network create exit8-net
 
 - 기존 DB 컨테이너를 네트워크에 연결
 ```
-docker network connect exit8-net db-postgres
-docker network connect exit8-net db-redis
+docker network connect exit8-net postgres
+docker network connect exit8-net redis
 ```
 
 - backend 실행 (같은 네트워크)

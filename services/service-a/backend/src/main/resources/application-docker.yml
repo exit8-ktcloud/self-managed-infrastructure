@@ -1,11 +1,24 @@
 spring:
   datasource:
-    url: jdbc:postgresql://db-postgres:5432/EXIT8
-    username: exit8
-    password: exit8pass
+    url: jdbc:postgresql://postgres:5432/EXIT8
+    username: admin
+    password: changeme
     driver-class-name: org.postgresql.Driver
 
   data:
     redis:
-      host: db-redis
+      host: redis
       port: 6379
+
+management:
+  health:
+    db:
+      enabled: false
+    redis:
+      enabled: false
+    circuitbreakers:
+      enabled: false   # ⬅ docker healthcheck용 핵심
+
+  endpoint:
+    health:
+      show-details: never

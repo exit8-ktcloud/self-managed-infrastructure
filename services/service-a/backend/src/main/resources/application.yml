@@ -1,6 +1,7 @@
 spring:
   application:
-    name: backend-spring
+    name: service-a-backend
+
   jpa:
     hibernate:
       ddl-auto: update # create update
@@ -10,6 +11,9 @@ spring:
         format_sql: true
 
 management:
+  health:
+    circuitbreakers:
+      enabled: true # 서킷 브레이커 상태를 /actuator/health에 포함
   endpoints:
     web:
       exposure:
@@ -19,30 +23,26 @@ management:
       application: ${spring.application.name}
 
 resilience4j.circuitbreaker:
-    instances:
-      testCircuit:
-        register-health-indicator: true
-
-        # 최근 호출 기준 설정
-        sliding-window-type: COUNT_BASED
-        sliding-window-size: 10
-
-        # 실패율 기준
-        failure-rate-threshold: 50
-
-        # 느린 호출 기준 (ms)
-        slow-call-duration-threshold: 2000
-        slow-call-rate-threshold: 50
-
-        # OPEN 상태 유지 시간
-        wait-duration-in-open-state: 10s
-
-        # HALF_OPEN 상태에서 허용 호출 수
-        permitted-number-of-calls-in-half-open-state: 3
-
-        # 예외 기록 기준
-        record-exceptions:
-          - java.lang.Exception
-
-        # 성공으로 간주할 예외 (없음)
-        ignore-exceptions: []
+  configs:
+    default: # 공통 설정
+      # 최근 호출 기준 설정
+      sliding-window-type: COUNT_BASED
+      sliding-window-size: 10
+      # 실패율 기준
+      failure-rate-threshold: 50
+  instances:
+    testCircuit:
+      baseConfig: default
+      register-health-indicator: true
+      # 느린 호출 기준 (ms)
+      slow-call-duration-threshold: 2000
+      slow-call-rate-threshold: 50
+      # OPEN 상태 유지 시간
+      wait-duration-in-open-state: 10s
+      # HALF_OPEN 상태에서 허용 호출 수
+      permitted-number-of-calls-in-half-open-state: 3
+      # 예외 기록 기준
+      record-exceptions:
+        - java.lang.Exception
+      # 성공으로 간주할 예외 (없음)
+      ignore-exceptions: []
