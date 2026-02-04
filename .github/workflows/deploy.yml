@@ -380,7 +380,7 @@ jobs:
             SERVICES_TO_UPDATE=$(echo "$SERVICES_TO_UPDATE" | xargs)
 
             # Use docker compose (V2) with fallback to docker-compose (V1)
-            if command -v docker compose &> /dev/null; then
+            if docker compose version &> /dev/null 2>&1; then
               COMPOSE_CMD="docker compose"
             else
               COMPOSE_CMD="docker-compose"
