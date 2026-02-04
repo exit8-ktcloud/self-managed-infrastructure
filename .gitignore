@@ -33,3 +33,7 @@ dist/
 build/
 target/
 *.jar
+
+# Gradle Wrapper (must be committed)
+!services/service-a/backend/gradle/wrapper/gradle-wrapper.jar
+!services/service-a/backend/gradle/wrapper/gradle-wrapper.properties
