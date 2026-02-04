@@ -379,22 +379,13 @@ jobs:
             # Trim leading/trailing whitespace
             SERVICES_TO_UPDATE=$(echo "$SERVICES_TO_UPDATE" | xargs)
 
-            # Define compose command function (handles docker compose vs docker-compose)
-            compose_cmd() {
-              if docker compose version &> /dev/null 2>&1; then
-                docker compose "$@"
-              else
-                docker-compose "$@"
-              fi
-            }
-
             # If docker-compose.yml changed, restart all services
             if [ "$DOCKER_COMPOSE_CHANGED" == "true" ]; then
               echo "docker-compose.yml changed - restarting all services..."
-              compose_cmd up -d --remove-orphans
+              docker-compose up -d --remove-orphans
             elif [ -n "$SERVICES_TO_UPDATE" ]; then
               echo "Updating services: $SERVICES_TO_UPDATE"
-              compose_cmd up -d --no-deps $SERVICES_TO_UPDATE
+              docker-compose up -d --no-deps $SERVICES_TO_UPDATE
             else
               echo "No services to update"
             fi
