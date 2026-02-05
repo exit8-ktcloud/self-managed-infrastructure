@@ -209,7 +209,6 @@ services:
       - "8200:8200"
     environment:
       VAULT_ADDR: http://0.0.0.0:8200
-      VAULT_API_ADDR: http://0.0.0.0:8200
       SKIP_CHOWN: "true"
       SKIP_SETCAP: "true"
     volumes:
@@ -217,7 +216,7 @@ services:
       - vault_data:/vault/data
     cap_add:
       - IPC_LOCK
-    command: server -config=/vault/config/vault.hcl
+    command: server
     networks:
       - backend
     healthcheck:
