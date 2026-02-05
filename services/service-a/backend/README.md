@@ -67,23 +67,35 @@ services/service-a/backend/
 │   │   ├── ApiException.java
 │   │   └── GlobalExceptionHandler.java
 │   │
+│   ├── filter/
+│   │   └── TraceIdFilter.java              # HTTP 진입 trace_id 생성 + MDC 전파
+│   │
+│   │
 │   ├── logging/
-│   │   ├── LogAspect.java                     # 저장 트리거
-│   │   ├── LogLevelPolicy.java                # 레벨 판단
-│   │   ├── TraceIdGenerator.java              # trace_id 생성
+│   │   ├── LogAspect.java                  # LOAD_START / END / FAIL 트리거
+│   │   ├── LogLevelPolicy.java             # INFO / WARN / ERROR 판단
+│   │   ├── LogEvent.java                   # 이벤트 상수 (LOAD_START 등)
+│   │   └── TraceContext.java               # MDC 기반 trace_id 접근 전용
+│   │
+│   ├── observability/
+│   │   ├── metrics/
+│   │   │   └── MetricsConfig.java           # Micrometer 커스텀 설정
+│   │   └── tracing/
+│   │       └── TraceConstants.java          # trace_id 키 등 공통 상수
 │   │
 │   └── config/
 │       ├── datasource/
 │       │   └── PostgresConfig.java
 │       ├── redis/
 │       │   └── RedisConfig.java
-│       └── resilience/
-│           └── CircuitBreakerConfig.java
+│       └── observability/
+│           └── MetricsConfig.java
 │
 └── src/main/resources/
     ├── application.yml
     ├── application-local.yml
-    └── application-docker.yml
+    ├── application-docker.yml
+    └── logback-spring.xml                   # JSON 구조 로그 출력
 
 ```
 ---
