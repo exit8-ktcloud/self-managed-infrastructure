@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import text
 from app.database.session import get_db
 from app.core.logger import logger
-from app.models import User  # User 모델 가져오기
+
 
 router = APIRouter()
 
@@ -13,7 +13,6 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-# 공통 응답 포맷 함수
 def create_response(success_code: int, data: dict = None, error: dict = None):
     return {"success": success_code, "data": data, "error": error}
 
@@ -24,16 +23,18 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        stmt = select(User).where(User.username == login_data.username)
-        result = await db.execute(stmt)
-        user = result.scalars().first()
+        # 취약점 발생 지점
+        # 입력값을 검증 없이 f-string으로 쿼리에 바로 꽂아버림 (SQL Injection)
+        
+        query = text(f"SELECT id, username, email, is_admin FROM fastapi_users WHERE username = '{login_data.username}' AND password = '{login_data.password}'")
+        
+        result = await db.execute(query)
+        user = result.mappings().first() # 검색된 행이 있으면 로그인 성공
 
-        # 비밀번호 검증 (현재는 평문 비교, 추후 해싱 적용 권장)
-        login_success = False
-        if user and user.password == login_data.password:
-            login_success = True
+        # 로그인 성공/실패 여부 결정
+        login_success = True if user else False
 
-        # 로그 기록 (Wazuh 관제용 표준 포맷)
+        # 로그 기록 (Wazuh 관제용)
         log_event = "LOGIN_SUCCESS" if login_success else "AUTH_UNAUTHORIZED"
         
         logger.info(log_event, extra={
@@ -43,13 +44,12 @@ async def login(
         })
 
         if login_success:
-            user_dict = {
+            return create_response(success_code=200, data={
                 "id": user.id,
                 "username": user.username,
                 "email": user.email,
                 "is_admin": user.is_admin
-            }
-            return create_response(success_code=200, data=user_dict)
+            })
         else:
             return JSONResponse(
                 status_code=401,
@@ -60,8 +60,8 @@ async def login(
             )
 
     except Exception as e:
-        # 서버 에러 로그
-        logger.error("SERVER_ERROR", extra={"error": str(e)})
+        # SQL 인젝션 공격 시 문법 에러가 나면 여기가 찍힘
+        logger.error("LOGIN_ERROR", extra={"error": str(e), "input_user": login_data.username})
         return JSONResponse(
             status_code=500,
             content=create_response(success_code=500, error={"code": "SERVER_ERROR", "message": "Internal Server Error"})
