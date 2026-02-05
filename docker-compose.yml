@@ -210,8 +210,10 @@ services:
     environment:
       VAULT_ADDR: http://0.0.0.0:8200
       VAULT_API_ADDR: http://0.0.0.0:8200
+      SKIP_CHOWN: "true"
+      SKIP_SETCAP: "true"
     volumes:
-      - ./services/vault/config:/vault/config:ro
+      - ./services/vault/config:/vault/config:rw
       - vault_data:/vault/data
     cap_add:
       - IPC_LOCK
@@ -223,7 +225,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 30s
     deploy:
       resources:
         limits:
