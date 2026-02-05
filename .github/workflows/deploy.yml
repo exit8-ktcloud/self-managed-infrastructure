@@ -328,11 +328,11 @@ jobs:
             cd /opt/exit8/self-managed-infrastructure || { echo "Error: /opt/exit8/self-managed-infrastructure directory not found"; exit 1; }
             echo "Current directory: $(pwd)"
 
-            # Fix git ownership issue (required for GitHub Actions SSH user)
+            # Fix permissions for deploy-bot
+            # 현재 디렉토리와 모든 하위 파일의 소유자를 deploy-bot으로 강제 설정
+            sudo chown -R deploy-bot:developers /opt/exit8/self-managed-infrastructure
+            # 실행 유저가 git 명령을 수행할 수 있도록 safe.directory 설정
             git config --global --add safe.directory /opt/exit8/self-managed-infrastructure
-
-            # Fix directory permissions for git operations
-            sudo chown -R $USER:$USER /opt/exit8/self-managed-infrastructure
 
             # Verify docker-compose.yml exists
             if [ ! -f "docker-compose.yml" ]; then
