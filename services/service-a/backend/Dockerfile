@@ -28,6 +28,10 @@ WORKDIR /app
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
+# 로그 디렉터리 생성 + 권한
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app
+
 # curl 설치 (healthcheck용)
 RUN apk add --no-cache curl
 
