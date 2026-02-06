@@ -1,9 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://postgres:5432/EXIT8
+    url: jdbc:postgresql://postgres:5432/appdb
     username: admin
     password: changeme
-    driver-class-name: org.postgresql.Driver
 
   data:
     redis:
@@ -17,7 +16,7 @@ management:
     redis:
       enabled: false
     circuitbreakers:
-      enabled: false   # ⬅ docker healthcheck용 핵심
+      enabled: false   # docker healthcheck용 핵심
 
   endpoint:
     health:

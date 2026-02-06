@@ -60,6 +60,9 @@ dependencies {
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    // Logstash Logback Encoder 추가
+    implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
 }
 
 tasks.named('test') {

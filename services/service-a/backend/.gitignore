@@ -14,3 +14,7 @@ out/
 .idea/
 .vscode/
 *.iml
+
+# shell
+deploy.bat
+deploy.ps1

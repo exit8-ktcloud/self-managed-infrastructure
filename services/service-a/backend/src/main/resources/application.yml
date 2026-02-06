@@ -2,6 +2,7 @@ spring:
   application:
     name: service-a-backend
   jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: update # create update
     show-sql: false
@@ -19,7 +20,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, prometheus, metrics
+        include: "health,prometheus,metrics"
   metrics:
     tags:
       application: ${spring.application.name}

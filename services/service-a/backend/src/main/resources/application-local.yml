@@ -1,9 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/EXIT8
+    url: jdbc:postgresql://localhost:5432/appdb
     username: exit8
     password: exit8pass
-    driver-class-name: org.postgresql.Driver
 
   data:
     redis:

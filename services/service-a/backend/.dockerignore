@@ -6,3 +6,5 @@ out
 .idea
 .vscode
 *.log
+deploy.bat
+deploy.ps1
