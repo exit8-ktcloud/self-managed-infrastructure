@@ -1,0 +1,67 @@
+<!--
+  JSON 구조 로그 설정
+
+  목적:
+  - 모든 로그를 JSON 형태로 출력
+  - trace_id, level, timestamp를 필드 기반으로 수집 가능
+  - Loki / ELK / Wazuh에서 별도 파싱 없이 ingest
+
+  설계 원칙:
+  - 로그는 "사람이 읽는 문자열"이 아니라
+    "시스템이 분석하는 데이터"
+-->
+<configuration>
+
+    <!-- 컨테이너 기준 절대경로 -->
+    <property name="LOG_PATH" value="/app/logs"/>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>Asia/Seoul</timeZone>
+                    <pattern>yyyy-MM-dd'T'HH:mm:ss.SSSXXX</pattern>
+                </timestamp>
+                <loggerName/>
+                <logLevel/>
+                <threadName/>
+                <message/>
+                <mdc/>
+            </providers>
+        </encoder>
+    </appender>
+
+    <appender name="JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/app.log</file>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/app-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>Asia/Seoul</timeZone>
+                    <pattern>yyyy-MM-dd'T'HH:mm:ss.SSSXXX</pattern>
+                </timestamp>
+                <logLevel/>          <!-- level -->
+                <threadName/>
+                <message/>
+                <mdc/>               <!-- trace_id -->
+                <arguments/>
+                <customFields>
+                    {"service":"service-a-backend"}
+                </customFields>
+            </providers>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="JSON"/>
+    </root>
+
+</configuration>
