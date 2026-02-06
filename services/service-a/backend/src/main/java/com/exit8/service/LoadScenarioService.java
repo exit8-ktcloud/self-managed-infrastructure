@@ -5,6 +5,7 @@ import com.exit8.domain.LoadTestLog;
 import com.exit8.exception.ApiException;
 import com.exit8.repository.DummyDataRepository;
 import com.exit8.repository.LoadTestLogRepository;
+import io.micrometer.core.annotation.Timed;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,11 @@ public class LoadScenarioService {
      * CPU 재귀 부하
      * CPU 부하 → CircuitBreaker OPEN까지 연결 (추후)
      */
+    @Timed(
+            value = "load.scenario",
+            extraTags = {"type", "cpu"},
+            histogram = true
+    )
     public void generateCpuLoad(long durationMs) {
         if (durationMs <= 0 || durationMs > MAX_DURATION_MS) {
             throw new ApiException(
@@ -53,6 +59,11 @@ public class LoadScenarioService {
     /**
      * DB READ 부하
      */
+    @Timed(
+            value = "load.scenario",
+            extraTags = {"type", "db_read"},
+            histogram = true
+    )
     public void simulateDbReadLoad(int repeatCount) {
         if (repeatCount <= 0 || repeatCount > MAX_REPEAT) {
             throw new ApiException(
@@ -79,6 +90,11 @@ public class LoadScenarioService {
     /**
      * DB write 부하
      */
+    @Timed(
+            value = "load.scenario",
+            extraTags = {"type", "db_write"},
+            histogram = true
+    )
     public void simulateDbWriteLoad(int repeatCount) {
         if (repeatCount <= 0 || repeatCount > MAX_REPEAT) {
             throw new ApiException(
