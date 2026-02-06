@@ -1,8 +1,10 @@
 package com.exit8.service;
 
 import com.exit8.exception.ApiException;
+import com.exit8.logging.LogEvent;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -39,8 +41,10 @@ public class CircuitBreakerTestService {
      */
     private String fallback(Throwable t) {
         log.warn(
-                "CIRCUIT_OPEN name={} message={}",
+                "event={} circuit={} trace_id={} message={}",
+                LogEvent.CIRCUIT_OPEN,
                 CIRCUIT_NAME,
+                MDC.get("trace_id"),
                 t.getMessage()
         );
 
