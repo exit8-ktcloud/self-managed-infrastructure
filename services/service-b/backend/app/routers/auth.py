@@ -24,10 +24,23 @@ async def login(
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        # 1. SQL Injection 공격 패턴 감지 (Wazuh 관제용)
-        suspicious_patterns = ["'", "--", "OR", "UNION", "SELECT", ";", "/*", "*/"]
-        detected = [p for p in suspicious_patterns 
-                    if p.upper() in login_data.username.upper() or p.upper() in login_data.password.upper()]
+               # 1. SQL Injection 공격 패턴 감지 (Wazuh 관제용)
+        import re
+        
+        # 오탐 방지를 위한 정규표현식 패턴
+        suspicious_patterns = [
+            re.compile("'\\s*(?:OR|AND)\\b", re.IGNORECASE),
+            re.compile("\\bUNION\\s+SELECT\\b", re.IGNORECASE),
+            re.compile("--"),
+            re.compile(";\\s*DROP\\b", re.IGNORECASE),
+            re.compile("/\\*.*?\\*/", re.IGNORECASE)
+        ]
+        
+        detected = []
+        for pattern in suspicious_patterns:
+            if (pattern.search(login_data.username) or 
+                pattern.search(login_data.password)):
+                detected.append(pattern.pattern)
 
         if detected:
             logger.warning("SUSPICIOUS_INPUT", extra={
@@ -68,9 +81,8 @@ async def login(
             )
 
     except Exception as e:
-        logger.error("LOGIN_ERROR", extra={"error": str(e), "input_user": login_data.username})
-        return JSONResponse(status_code=500, content=create_response(500, error={"code": "SERVER_ERROR"}))
-
+                logger.error("LOGIN_ERROR", extra={"error": str(e), "input_user": login_data.username[:50]})
+                return JSONResponse(status_code=500, content=create_response(500, error={"code": "SERVER_ERROR"}))
 
 # --- 2. 회원가입 (4가지 정보 입력: ID, Name, PW, Email) ---
 class RegisterRequest(BaseModel):
