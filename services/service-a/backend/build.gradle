@@ -80,7 +80,7 @@ dependencies {
     implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
 
     // Bucket4j (Servlet / In-memory 실험용)
-    implementation 'com.bucket4j:bucket4j-core:8.0.1'
+    implementation 'com.bucket4j:bucket4j-core:8.10.1'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
 
     // 1. Vault가 서버와 JSON으로 통신할 때 필요한 RestTemplate 및 Jackson 변환기 지원
