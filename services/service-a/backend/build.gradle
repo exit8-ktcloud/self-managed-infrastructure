@@ -59,7 +59,7 @@ dependencies {
     runtimeOnly 'org.postgresql:postgresql'
 
     // Resilience4j (Spring Boot 3 전용 스타터)
-    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.3.0'
     implementation 'org.springframework.session:spring-session-data-redis'
 
     // Observability (모니터링)
