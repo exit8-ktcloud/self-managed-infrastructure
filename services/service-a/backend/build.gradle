@@ -74,7 +74,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     // Logstash Logback Encoder 추가
-    implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+    implementation 'net.logstash.logback:logstash-logback-encoder:9.0'
 
     // vault
     implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
