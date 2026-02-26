@@ -21,5 +21,3 @@ setup_vault.bat
 
 # gradle temp
 gradle/wrapper/temp
-
-docs/

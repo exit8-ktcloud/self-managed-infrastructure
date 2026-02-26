@@ -7,4 +7,4 @@ out
 .vscode
 *.log
 deploy.bat
-deploy.ps1
+setup_vault.bat
