@@ -106,7 +106,7 @@ curl http://localhost:8080/actuator/health
 ```
 ---
 
-## 5. 테스트 불변식
+## 6. 테스트 불변식
 
 - CircuitBreaker 설정은 테스트 간 변경하지 않는다.
 - Redis TTL은 5분으로 고정한다.
