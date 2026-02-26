@@ -1,4 +1,4 @@
-# JMeter – External Abnormal Traffic Generator
+# JMeter – External Abnormal Traffic Generator for Service-A
 
 > 외부 비정상 트래픽을 발생시키기 위한 JMeter 전용 구성이다.   
 > 애플리케이션 성능 측정이 아닌, 운영 장애 상황 재현 및 방어 기법 검증을 목적으로 한다.
@@ -14,36 +14,48 @@
 
 ## 2. 논리적 위치
 - JMeter는 애플리케이션 구성 요소가 아니다.
-- 독립된 컨테이너로 실행되며, 실제 외부 공격자와 동일한 위치에서 요청을 전송한다.
-- Backend Service와는 네트워크만 공유하고, 제어·권한·코드는 분리된다.
+- JMeter는 외부 행위자(External Actor) 로 간주한다.
+- JMeter는 로컬/외부 환경에서 실행되며 공인 네트워크 경로를 통해 타겟 게이트웨이로 요청을 보낸다.
+- Backend Service와는 제어·권한·코드가 분리되어 있으며, 요청/응답 트래픽만 교환한다.
 ```
-JMeter (External Actor)  →  Backend Service (Target)
+JMeter (External Actor)
+  → Gateway (Public Listener)
+  → Backend Service (Target)
 ```
+> Gateway는 Nginx / NPM / 별도 Reverse Proxy 컨테이너 등으로 구현될 수 있다.   
+> 테스트 타겟은 “Backend 직접 포트”가 아니라 “Gateway의 외부 리슨 포트”로 고정한다.
+
+
+※ 현재 실험 환경 기준
+- Gateway: loadtest-gw (8081)  또는  NPM (80/443)
+- Backend 직접 포트(8080)는 실험 대상이 아니다.
 
 ---
 
 ## 3. 동작 원리 (3 Pillars)
 
 ### What
-- READ
-- WRITE
 ```
+# READ
 POST /api/load/db-read?repeatCount=1
+
+# WRITE
 POST /api/load/db-write?repeatCount=1
 ```
-> READ / WRITE는 서로 다른 실험 시나리오로 분리한다.   
-> 하나의 실험 시나리오에서는 단일 **Target API(Endpoint)**만 측정한다.   
-> 단, 해당 시나리오 내에는 부하를 유발하는 Attack-TG와 가용성을 체크하는 Normal-TG가 공존한다."
+- READ / WRITE는 서로 다른 실험 시나리오로 분리한다. 
+- 하나의 실험 시나리오에서는 단일 **Target API(Endpoint)**만 측정한다. 
+- 단, 해당 시나리오 내에는 부하를 유발하는 Attack-TG와 가용성을 체크하는 Normal-TG가 공존한다.
+- Target Method는 `POST`로 고정한다. (GET 호출 시 405 발생)
 
 ### How many
 - 동시 가상 사용자 수 (Thread 수)
 
 ### How long
 - 요청 간격 및 유지 시간
-- 부하의 강도는 Threads 수로 제어한다.
+- 기본 실험(Concurrency Stress Test)의 부하 강도는 Threads 수로 제어한다.
 - 단, DB 내부 자원 고갈(Resource Exhaustion) 실험에서는 요청 1건당 자원 점유 시간을 증가시키기 위해 repeatCount를 보조적으로 사용할 수 있다.
-- repeatCount는 동시성 증가 수단이 아니며, 동일 조건 비교 실험에서는 반드시 고정값을 유지한다.
-
+- repeatCount는 동시성 증가 수단이 아니라 요청 1건당 내부 작업량(점유 시간)을 증가시키는 보조 수단이다.
+- 동일 조건 비교 실험에서는 repeatCount를 반드시 고정값으로 유지한다.
 ---
 
 ## 4. 주요 구성 요소
@@ -57,9 +69,9 @@ POST /api/load/db-write?repeatCount=1
 
 ### HTTP Request
 - 동일한 API / Method / 파라미터 사용
-- X-Forwarded-For 헤더로 IP 구분하여 분리
-  - 단일 IP 공격
-  - 정상 사용자 트래픽
+- `X-Forwarded-For` 헤더로 IP 구분하여 분리
+  - 공격자 트래픽(Attack)
+  - 정상 사용자 트래픽(Normal)
 
 ### Listener
 - Non-GUI 모드로 실행
@@ -77,23 +89,21 @@ POST /api/load/db-write?repeatCount=1
 | IP         | 동일   | 다름     |
 | Header     | X-Forwarded-For: 10.10.10.10  | X-Forwarded-For: 20.20.20.20 |
 
-
 - 두 그룹은 같은 API, 같은 파라미터를 사용한다.
 - 차이는 **동시성(Thread), 요청 간격(Delay), IP**만 존재한다.
-- 요청 간격은 0ms를 허용하지 않는다.
+> Concurrency Stress Test에서는 Delay 0ms를 금지한다.   
+> (단, Resource Exhaustion Test에서는 예외적으로 Delay 0ms를 허용한다.)
 
-#### Attack-TG 구조
-> Thread 수는 DB maximum-pool-size(50)를 기준으로 설정한다.
+#### 구조 예시
 
 ```
 Attack-TG
 - threads: 30 → 45 → 50 → 60 → 80 → 100
-- ramp-up: 20~30
+- ramp-up: 20~30s
 - delay:
     READ  = 100~200ms
     WRITE = 150~300ms
 - loop: 50 (또는 단계별 2~3분 유지)
-
 
 Normal-TG
 - threads: 1~3
@@ -126,7 +136,7 @@ services/service-a/
    - 동시 요청 증가에 따른 임계 구간 탐색
    - Rate Limit / CircuitBreaker 보호 효과 검증
 2. 제약
-   - repeatCount = 1
+   - repeatCount = 1 (고정)
    - DB Pool = 50 (기본값)
    - Delay = 0ms 금지
    - Thread 수만 단계적으로 증가
@@ -190,10 +200,10 @@ services:
 ---
 
 ## 9. 실행 시나리오
-1. UI에서 “실험 시작” 트리거 발생
-2. Backend는 실험 시작 상태만 기록
+1. UI에서 “실험 시작” 트리거 발생 (선택)
+2. Backend는 실험 시작 상태만 기록 (선택)
 3. JMeter 컨테이너 실행
-4. JMeter가 외부 공격자 역할로 backend에 트래픽 유입
+4. JMeter가 외부 공격자 역할로 Gateway(Public Listener) 로 트래픽 유입
 5. backend는 Rate Limit / Circuit Breaker로 대응
 
 ---
@@ -217,24 +227,6 @@ services:
 read_result_60.jtl
 write_result_40.jtl
 ```
-
-### 개발 단계 시뮬레이션
-1. GUI 사용 ❌
-2. Response 저장 ❌
-3. CSV 최소 필드 저장 ⭕
-4. HTML 리포트 생성
-
-```
-docker run --rm ^
-  -v "%cd%:/jmeter" ^
-  spring-jmeter ^
-  jmeter -g /jmeter/results/write_result_45.jtl ^
-          -o /jmeter/results/report_write_45
-```
-
-> response body는 저장하지 않는다.   
-> 부하 실험의 목적은 응답 시간 및 실패율 관측이며,      
-> Payload 분석은 범위에 포함하지 않는다.
 
 ---
 
@@ -261,37 +253,6 @@ docker run --rm ^
    - Rate Limit 적용 전·후 정상 트래픽 보호 여부
    - CircuitBreaker 동작 여부
 
-#### 바로 실행
-```
-docker build -t spring-jmeter .
-
-docker run --rm \
-  -e TZ=Asia/Seoul \
-  -e JVM_ARGS="-Duser.timezone=Asia/Seoul" \
-  -v "${PWD}:/jmeter" \
-  spring-jmeter \
-  jmeter -n \
-  -t /jmeter/scenarios/attack_read_vs_normal.jmx \
-  -l /jmeter/results/read_result_50.jtl \
-  -Jjmeter.save.saveservice.output_format=csv \
-  -Jjmeter.save.saveservice.response_data=false \
-  -Jjmeter.save.saveservice.response_headers=false \
-  -Jjmeter.save.saveservice.requestHeaders=false \
-  -Jjmeter.save.saveservice.samplerData=false \
-  -Jjmeter.save.saveservice.assertion_results=none \
-  -Jjmeter.save.saveservice.bytes=true \
-  -Jjmeter.save.saveservice.latency=true \
-  -Jjmeter.save.saveservice.connect_time=true \
-  -JATTACK_THREADS=50 \
-  -JATTACK_RAMP=30 \
-  -JATTACK_DELAY=150 \
-  -JATTACK_LOOPS=50 \
-  -JNORMAL_THREADS=3 \
-  -JNORMAL_DELAY=1000 \
-  -JNORMAL_LOOPS=50
-
-```
-
 ### attack_write_vs_normal.jmx
 
 > DB WRITE 기반 부하 상황
@@ -314,37 +275,6 @@ docker run --rm \
    - Rate Limit 적용 전·후 쓰기 병목 완화 효과
    - CircuitBreaker 동작 여부
 
-#### 바로 실행
-```
-docker build -t spring-jmeter .
-
-docker run --rm \
-  -e TZ=Asia/Seoul \
-  -e JVM_ARGS="-Duser.timezone=Asia/Seoul" \
-  -v "${PWD}:/jmeter" \
-  spring-jmeter \
-  jmeter -n \
-  -t /jmeter/scenarios/attack_write_vs_normal.jmx \
-  -l /jmeter/results/write_result.jtl \
-  -Jjmeter.save.saveservice.output_format=csv \
-  -Jjmeter.save.saveservice.response_data=false \
-  -Jjmeter.save.saveservice.response_headers=false \
-  -Jjmeter.save.saveservice.requestHeaders=false \
-  -Jjmeter.save.saveservice.samplerData=false \
-  -Jjmeter.save.saveservice.assertion_results=none \
-  -Jjmeter.save.saveservice.bytes=true \
-  -Jjmeter.save.saveservice.latency=true \
-  -Jjmeter.save.saveservice.connect_time=true \
-  -JATTACK_THREADS=45 \
-  -JATTACK_RAMP=30 \
-  -JATTACK_DELAY=250 \
-  -JATTACK_LOOPS=50 \
-  -JNORMAL_THREADS=3 \
-  -JNORMAL_DELAY=1000 \
-  -JNORMAL_LOOPS=50
-
-
-```
 
 ### 두 시나리오의 차이
 > 부하= Thread 수 × 요청 간격 × 실험 시간   

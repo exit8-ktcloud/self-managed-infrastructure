@@ -14,12 +14,11 @@ spring:
 
   datasource:
     hikari:
-      maximum-pool-size: 50  # 동시에 가질 수 있는 커넥션 수 증가
-      minimum-idle: 10 # 커넥션 풀의 “항상 유지되는 최소 유휴(Idle) 커넥션 수
-      connection-timeout: 3000 # 커넥션 획득 대기 시간 (3초)
-      validation-timeout: 1000 # 커넥션 검증 시 최대 1초까지 대기
-      leak-detection-threshold: 10000 # 10초 이상 커넥션을 점유하면 경고 (현재 발생 중인 에러 방지)
-
+      maximum-pool-size: 50              # 풀 크기(동시 DB 커넥션 상한)
+      minimum-idle: 10                   # 유휴 커넥션 유지
+      connection-timeout: 5000           # 풀 고갈 시 5초 대기 후 예외(획득 실패)
+      validation-timeout: 2000           # 커넥션 검증 타임아웃
+      leak-detection-threshold: 10000    # 장기 점유 감지(디버깅용)
   data:
     redis:
       timeout: 1000ms
@@ -85,24 +84,32 @@ resilience4j.circuitbreaker:
     default: # 공통 설정
       # 최근 호출 기준 설정
       sliding-window-type: COUNT_BASED
-      sliding-window-size: 20
-      minimum-number-of-calls: 20
-      failure-rate-threshold: 50
+      sliding-window-size: 30 # 최근 30건 기반 평가
+      minimum-number-of-calls: 30 # 30건 쌓여야 평가 시작
+      failure-rate-threshold: 50 # 실패율 50% 이상이면 OPEN
   instances:
     testCircuit:
       baseConfig: default
       automatic-transition-from-open-to-half-open-enabled: true # 자동 전환 옵션
       register-health-indicator: true
-      slow-call-duration-threshold: 2000
-      slow-call-rate-threshold: 50
-      wait-duration-in-open-state: 10s
+      slow-call-duration-threshold: 3000 # 3초 초과는 slow-call로 분류
+      slow-call-rate-threshold: 50       # slow-call 비율 50% 이상이면 OPEN
+      wait-duration-in-open-state: 10s   # OPEN 후 10초 뒤 HALF_OPEN
       # HALF_OPEN 상태에서 허용 호출 수
-      permitted-number-of-calls-in-half-open-state: 3
+      permitted-number-of-calls-in-half-open-state: 5
       # 예외 기록 기준
       record-exceptions:
-        - java.lang.Exception
-      # 성공으로 간주할 예외 (없음)
-      ignore-exceptions: []
+        - java.sql.SQLException
+        - org.springframework.dao.DataAccessException
+        - org.springframework.jdbc.CannotGetJdbcConnectionException
+        - org.springframework.transaction.CannotCreateTransactionException
+        - org.hibernate.exception.JDBCConnectionException
+        - java.util.concurrent.TimeoutException
+      # 성공으로 간주할 예외
+      ignore-exceptions:
+        - com.exit8.exception.ApiException
+        - org.springframework.web.bind.MethodArgumentNotValidException
+        - org.springframework.web.bind.MissingServletRequestParameterException
 
 # Rate Limit 적용
 rate-limit:
