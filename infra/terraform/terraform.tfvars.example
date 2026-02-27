@@ -1,0 +1,38 @@
+# Example terraform.tfvars file
+# Copy this to terraform.tfvars and update with your actual values
+
+# REQUIRED: Replace with your actual GCP Project ID
+project_id = "your-gcp-project-id"
+
+# OPTIONAL: Region (default: asia-northeast3 for Seoul)
+region = "asia-northeast3"
+
+# OPTIONAL: Zone (default: asia-northeast3-a)
+zone = "asia-northeast3-a"
+
+# OPTIONAL: VM instance name (default: exit8-vm)
+instance_name = "exit8-vm"
+
+# OPTIONAL: PostgreSQL database name (default: exit8-postgres)
+db_name = "exit8-postgres"
+
+# OPTIONAL: Redis instance name (default: exit8-redis)
+redis_name = "exit8-redis"
+
+# OPTIONAL: Load balancer name (default: exit8-lb)
+lb_name = "exit8-lb"
+
+# OPTIONAL: Cloud SQL instance tier (default: db-custom-2-8192)
+db_tier = "db-custom-2-8192"
+
+# OPTIONAL: Memorystore tier - BASIC or STANDARD (default: BASIC)
+memorystore_tier = "BASIC"
+
+# OPTIONAL: Cloud SQL storage size in GB (default: 10)
+db_size = 10
+
+# OPTIONAL: Cloud SQL vCPU count (default: 2)
+db_cpu = 2
+
+# OPTIONAL: Cloud SQL RAM in GB (default: 8)
+db_ram = 8

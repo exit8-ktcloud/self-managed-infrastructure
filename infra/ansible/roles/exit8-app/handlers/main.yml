@@ -1,0 +1,12 @@
+---
+# Handlers for Exit8 App role
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: Restart Exit8
+  command: docker-compose restart
+  args:
+    chdir: "{{ app_dir }}"
+  become_user: ubuntu

@@ -1,0 +1,46 @@
+---
+# Main Playbook - Exit8 Infrastructure Provisioning
+# Usage: ansible-playbook -i inventory/hosts.ini site.yml
+
+- name: Provision Exit8 Infrastructure
+  hosts: exit8
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Gather package facts
+      package_facts:
+        manager: auto
+      tags: always
+
+    - name: Display target info
+      debug:
+        msg: |
+          Provisioning Exit8 on {{ inventory_hostname }}
+          OS: {{ ansible_distribution }} {{ ansible_distribution_version }}
+          Memory: {{ ansible_memtotal_mb }} MB
+          CPU Cores: {{ ansible_processor_vcpus }}
+      tags: always
+
+  roles:
+    - role: docker
+      tags: [docker, base]
+    - role: exit8-app
+      tags: [app, exit8]
+    - role: monitoring
+      tags: [monitoring, observability]
+
+  post_tasks:
+    - name: Display completion message
+      debug:
+        msg: |
+          ✅ Exit8 Infrastructure Provisioned Successfully!
+          
+          Application Directory: {{ app_dir }}
+          Docker Compose: {{ docker_compose_path }}
+          
+          Next steps:
+          1. Configure environment variables in {{ app_dir }}/.env
+          2. Run: cd {{ app_dir }} && docker-compose up -d
+          3. Verify: docker-compose ps
+      tags: always

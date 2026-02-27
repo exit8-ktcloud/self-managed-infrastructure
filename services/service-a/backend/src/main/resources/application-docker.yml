@@ -13,6 +13,23 @@ spring:
       host: redis
       port: 6379
 
+  # Cache Configuration (2-Tier: Caffeine L1 + Redis L2)
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600s
+      cache-null-values: false
+      key-prefix: "exit8:"
+      use-key-prefix: true
+
+# Cache-specific settings
+cache:
+  caffeine:
+    max-size: 1000
+    expire-after-write: 300
+  redis:
+    default-ttl: 600
+
 management:
   health:
     db:

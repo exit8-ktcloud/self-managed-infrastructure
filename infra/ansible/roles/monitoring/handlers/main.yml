@@ -1,0 +1,12 @@
+---
+# Handlers for Monitoring role
+
+- name: Restart node_exporter
+  systemd:
+    name: node_exporter
+    state: restarted
+
+- name: Restart ops-agent
+  systemd:
+    name: google-cloud-ops-agent
+    state: restarted

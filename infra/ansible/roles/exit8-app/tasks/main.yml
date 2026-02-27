@@ -1,0 +1,103 @@
+---
+# Exit8 Application Deployment
+# Deploys the Exit8 application stack using Docker Compose
+
+- name: Create application directory
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+    owner: ubuntu
+    group: ubuntu
+  loop:
+    - "{{ app_dir }}"
+    - "{{ backup_dir }}"
+    - "{{ app_dir }}/config"
+    - "{{ app_dir }}/data"
+    - "{{ app_dir }}/logs"
+    - "{{ app_dir }}/scripts"
+
+- name: Check if docker-compose.yml exists
+  stat:
+    path: "{{ docker_compose_path }}"
+  register: compose_file
+
+- name: Clone Exit8 repository (if not exists)
+  git:
+    repo: "https://github.com/your-org/exit8.git"  # Replace with actual repo
+    dest: "{{ app_dir }}"
+    version: main
+    force: yes
+  when: not compose_file.stat.exists
+  become_user: ubuntu
+
+- name: Create .env file from template
+  template:
+    src: env.j2
+    dest: "{{ app_dir }}/.env"
+    mode: '0600'
+    owner: ubuntu
+    group: ubuntu
+  no_log: true
+
+- name: Create Cloud SQL Proxy service
+  template:
+    src: cloud-sql-proxy.service.j2
+    dest: /etc/systemd/system/cloud-sql-proxy.service
+    mode: '0644'
+  notify: Reload systemd
+
+- name: Enable and start Cloud SQL Proxy
+  systemd:
+    name: cloud-sql-proxy
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Pull Docker images
+  command: docker-compose pull
+  args:
+    chdir: "{{ app_dir }}"
+  become_user: ubuntu
+  when: compose_file.stat.exists
+
+- name: Start Exit8 application stack
+  command: docker-compose up -d --remove-orphans
+  args:
+    chdir: "{{ app_dir }}"
+  become_user: ubuntu
+  register: compose_up
+
+- name: Wait for services to be healthy
+  pause:
+    seconds: 30
+  when: compose_up.changed
+
+- name: Verify all containers are running
+  command: docker-compose ps -q
+  args:
+    chdir: "{{ app_dir }}"
+  register: running_containers
+  become_user: ubuntu
+
+- name: Display running containers
+  debug:
+    msg: "{{ running_containers.stdout_lines | length }} containers running"
+
+- name: Setup backup cron job
+  cron:
+    name: "Exit8 backup"
+    job: "{{ app_dir }}/scripts/backup.sh"
+    cron_file: exit8-backup
+    user: ubuntu
+    minute: "0"
+    hour: "2"
+  tags: backup
+
+- name: Create backup script
+  template:
+    src: backup.sh.j2
+    dest: "{{ app_dir }}/scripts/backup.sh"
+    mode: '0755'
+    owner: ubuntu
+  tags: backup

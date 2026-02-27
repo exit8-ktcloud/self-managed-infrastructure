@@ -28,40 +28,11 @@ spring:
           max-idle: 10     # 유휴 연결 최대 유지 수
           min-idle: 2      # 최소 유휴 연결 유지 수
 
-  # Vault 설정을 최우선으로 가져오도록 명시
-  config:
-    import: "optional:vault://"
+  # GCP Secret Manager (replaces Vault)
+  # Secrets are now loaded from environment variables
+  # DATABASE_HOST, DATABASE_PORT, DATABASE_NAME, DATABASE_USER, DATABASE_PASSWORD
+  # REDIS_HOST, REDIS_PORT
 
-  cloud:
-    vault:
-      uri: ${VAULT_URI:http://vault:8200}
-      authentication: APPROLE
-      app-role:
-        role-id: ${VAULT_ROLE_ID}
-        secret-id: ${VAULT_SECRET_ID}
-        role: service-a-backend
-        app-role-path: approle
-      kv:
-        enabled: true
-        backend: secret
-        application-name: service-a-backend
-        # 공통 경로(/application) 탐색을 비활성화
-        default-context: service-a-backend
-        profiles: []
-      # Vault 일시 불가 시 앱 기동 실패 방지
-      fail-fast: false
-      config:
-        lifecycle:
-          enabled: true
-          # 갱신 실패(max_ttl 도달 등) 시 token renew 대신 AppRole 재인증 수행
-          # → retry storm 근본 차단: 갱신 루프 대신 새 토큰으로 즉시 복구
-          renewal-mode: re_authenticate
-          # 갱신 시도 최소 간격 (10초 미만 재시도 금지)
-          min-renewal: 10s
-          # 만료 15초 전부터 사전 갱신 시작
-          expiry-threshold: 15s
-
-server:
   port: 8080
   shutdown: graceful
 
@@ -118,3 +89,11 @@ rate-limit:
 # Redis 적용
 redis-cache:
   enabled: ${REDIS_CACHE_ENABLED:false}
+
+# 2-Tier Cache Settings (Caffeine L1 + Redis L2)
+cache:
+  caffeine:
+    max-size: ${CAFFEINE_MAX_SIZE:1000}
+    expire-after-write: ${CAFFEINE_EXPIRE_AFTER_WRITE:300}
+  redis:
+    default-ttl: ${REDIS_CACHE_TTL:600}

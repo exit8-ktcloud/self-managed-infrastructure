@@ -1,0 +1,18 @@
+[Unit]
+Description=Cloud SQL Proxy for Exit8
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+ExecStart=/usr/local/bin/cloud-sql-proxy \
+  --address=0.0.0.0 \
+  --port=5432 \
+  --private-ip \
+  {{ project_id }}:{{ region }}:{{ db_instance_name }}
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
