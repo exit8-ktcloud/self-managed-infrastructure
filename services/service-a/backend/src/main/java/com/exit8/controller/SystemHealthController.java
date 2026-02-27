@@ -87,11 +87,11 @@ public class SystemHealthController {
      *
      * - 인메모리 RequestEventBuffer 기반
      * - 최근 N건 요청 이벤트 반환
-     * - 기본값: 50
+     * - 기본값: 100
      */
     @GetMapping("/recent-requests")
     public ResponseEntity<DefaultResponse<List<RequestEvent>>> recentRequests(
-            @RequestParam(defaultValue = "50") int limit
+            @RequestParam(defaultValue = "100") int limit
     ) {
         List<RequestEvent> events =
                 systemHealthService.getRecentRequests(limit);
