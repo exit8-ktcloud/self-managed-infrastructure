@@ -1,0 +1,39 @@
+#!/bin/bash
+# Exit8 Backup Script
+# Backs up PostgreSQL database and application data
+
+set -euo pipefail
+
+BACKUP_DIR="{{ backup_dir }}"
+DATE=$(date +%Y%m%d_%H%M%S)
+RETENTION_DAYS={{ backup_retention_days }}
+
+# Create backup directory
+mkdir -p "${BACKUP_DIR}/${DATE}"
+
+echo "Starting backup at $(date)"
+
+# Database backup (using pg_dump via Cloud SQL Proxy)
+echo "Backing up database..."
+PGPASSWORD="{{ db_password }}" pg_dump \
+  -h localhost \
+  -p 5432 \
+  -U {{ db_user }} \
+  -d {{ db_name }} \
+  -F c \
+  -f "${BACKUP_DIR}/${DATE}/database.backup"
+
+# Application data backup
+echo "Backing up application data..."
+tar -czf "${BACKUP_DIR}/${DATE}/app_data.tar.gz" \
+  -C {{ app_dir }} \
+  data/ \
+  config/ \
+  --exclude='*.log'
+
+# Clean old backups
+echo "Cleaning backups older than ${RETENTION_DAYS} days..."
+find "${BACKUP_DIR}" -type d -mtime +${RETENTION_DAYS} -exec rm -rf {} +
+
+echo "Backup completed at $(date)"
+echo "Backup size: $(du -sh "${BACKUP_DIR}/${DATE}" | cut -f1)"

@@ -1,0 +1,16 @@
+<group name="local_rules,">
+
+  <rule id="100100" level="12">
+    <if_sid>31103, 31106, 31110, 31151</if_sid>
+    <description>Critical: SQL Injection Attempt Detected!</description>
+    <group>sql_injection_alert</group>
+  </rule>
+
+  <rule id="100101" level="12" frequency="8" timeframe="120">
+    <if_matched_sid>5710</if_matched_sid>
+    <same_source_ip />
+    <description>Critical: SSH Brute Force Attack Detected!</description>
+    <group>bruteforce_alert</group>
+  </rule>
+
+</group>

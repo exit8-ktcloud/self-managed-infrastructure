@@ -1,0 +1,63 @@
+---
+# Exit8 Infrastructure Variables
+# Override these in group_vars/all.yml or via -e flag
+
+# Project info
+project_name: exit8
+environment: demo
+
+# Paths
+app_dir: /opt/exit8
+docker_compose_path: /opt/exit8/docker-compose.yml
+backup_dir: /opt/exit8/backups
+
+# VM specs
+vm_memory_gb: 16
+vm_cpu_cores: 4
+
+# Database (Cloud SQL)
+db_host: "{{ lookup('env', 'CLOUD_SQL_PRIVATE_IP') }}"
+db_port: 5432
+db_instance_name: exit8-postgres    # Cloud SQL 인스턴스명 (Proxy 연결 이름에 사용)
+db_name: exit8_app                  # PostgreSQL 데이터베이스명 (JDBC URL에 사용)
+db_user: exit8_app_user
+db_password: "{{ lookup('env', 'DB_PASSWORD') }}"
+
+# Redis (Memorystore)
+redis_host: "{{ lookup('env', 'REDIS_HOST') }}"
+redis_port: 6379
+
+# Docker
+docker_compose_version: "2.24.0"
+docker_daemon_config:
+  log-driver: json-file
+  log-opts:
+    max-size: "100m"
+    max-file: "3"
+  live-restore: true
+  default-ulimits:
+    nofile:
+      Name: nofile
+      Hard: 65536
+      Soft: 65536
+
+# Java (Spring Boot)
+java_version: 17
+
+# Python (FastAPI)
+python_version: "3.11"
+
+# Monitoring
+prometheus_retention: "15d"
+grafana_admin_user: admin
+
+# Security
+firewall_allowed_ports:
+  - "22"    # SSH
+  - "80"    # HTTP
+  - "443"   # HTTPS
+  - "8080"  # Application
+
+# Backup
+backup_retention_days: 7
+backup_schedule: "0 2 * * *"  # Daily at 2 AM

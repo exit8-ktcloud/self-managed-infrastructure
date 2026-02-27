@@ -13,13 +13,31 @@ spring:
       host: localhost
       port: 6379
 
+  # Cache Configuration (2-Tier: Caffeine L1 + Redis L2)
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600s
+      cache-null-values: false
+      key-prefix: "exit8:"
+      use-key-prefix: true
+
+# Cache-specific settings
+cache:
+  caffeine:
+    max-size: 1000
+    expire-after-write: 300
+  redis:
+    default-ttl: 600
+
 logging:
   level:
     org.springframework.cloud.vault.config: DEBUG
     org.springframework.cloud.vault: DEBUG
+    org.springframework.cache: DEBUG
 
 management:
   health:
     circuitbreakers:
-      enabled: true # 서킷 브레이커 상태를 /actuator/health에 포함
+      enabled: true
       show-details: always

@@ -38,15 +38,7 @@ bootRun {
     // Spring Profile (기본값: local)
     environment "SPRING_PROFILES_ACTIVE",
             System.getenv("SPRING_PROFILES_ACTIVE") ?: "local"
-
-    // Vault 필수 환경 변수 (없으면 기본값)
-    environment "VAULT_URI",
-            System.getenv("VAULT_URI") ?: "http://localhost:8200"
-
-    environment "VAULT_TOKEN",
-            System.getenv("VAULT_TOKEN") ?: "root-token"
 }
-
 
 dependencies {
     // Web & AOP
@@ -56,6 +48,7 @@ dependencies {
     // DB & Persistence
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
     runtimeOnly 'org.postgresql:postgresql'
 
     // Resilience4j (Spring Boot 3 전용 스타터)
@@ -76,20 +69,10 @@ dependencies {
     // Logstash Logback Encoder 추가
     implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
 
-    // vault
-    implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
-
     // Bucket4j (Servlet / In-memory 실험용)
     implementation 'com.bucket4j:bucket4j-core:8.0.1'
     implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
-
-    // 1. Vault가 서버와 JSON으로 통신할 때 필요한 RestTemplate 및 Jackson 변환기 지원
-    implementation 'org.springframework.boot:spring-boot-starter-json'
-
-    // 2. 만약 위 스타터로 해결이 안 된다면 명시적으로 spring-web 추가 (이미 있을 확률이 높지만 재확인)
-    implementation 'org.springframework.boot:spring-boot-starter-web'
 }
-
 dependencyManagement {
     imports {
         mavenBom "org.springframework.cloud:spring-cloud-dependencies:2024.0.0"

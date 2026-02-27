@@ -1,0 +1,93 @@
+---
+# Docker Installation and Configuration
+# Installs Docker, Docker Compose, and configures daemon
+
+- name: Check if Docker is installed
+  command: docker --version
+  register: docker_version
+  changed_when: false
+  failed_when: false
+
+- name: Install Docker prerequisites
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
+    update_cache: yes
+  when: docker_version.rc != 0
+
+- name: Add Docker GPG key
+  apt_key:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    state: present
+  when: docker_version.rc != 0
+
+- name: Add Docker repository
+  apt_repository:
+    repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+  when: docker_version.rc != 0
+
+- name: Install Docker
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+  when: docker_version.rc != 0
+
+- name: Install Docker Compose (standalone)
+  get_url:
+    url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+    dest: /usr/local/bin/docker-compose
+    mode: '0755'
+  when: docker_version.rc != 0
+
+- name: Create docker group
+  group:
+    name: docker
+    state: present
+
+- name: Add ubuntu user to docker group
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+
+- name: Configure Docker daemon
+  copy:
+    content: "{{ docker_daemon_config | to_nice_json }}"
+    dest: /etc/docker/daemon.json
+    mode: '0644'
+  notify: Restart Docker
+
+- name: Ensure Docker service is running
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Verify Docker installation
+  command: docker --version
+  register: docker_verify
+  changed_when: false
+
+- name: Verify Docker Compose installation
+  command: docker-compose --version
+  register: compose_verify
+  changed_when: false
+
+- name: Display Docker versions
+  debug:
+    msg: |
+      Docker: {{ docker_verify.stdout }}
+      Docker Compose: {{ compose_verify.stdout }}

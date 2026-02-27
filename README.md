@@ -1,6 +1,25 @@
 # Exit8 Project
 
-GCP 기반 경량 All-in-one 보안 플랫폼 구축  
+GCP 기반 All-in-one 보안 플랫폼 구축
+
+## Server Specs
+
+| 항목 | 사양 |
+|------|------|
+| CPU | 4 vCPU |
+| Memory | 16 GB |
+| Platform | GCP (e2-standard-4) |
+
+**메모리 할당 (docker-compose.yml 기준):**
+
+| 레이어 | 서비스 | Memory Limit |
+|--------|--------|-------------|
+| Wazuh SIEM | manager + indexer + dashboard | 2048M + 3072M + 1024M |
+| 데이터 | postgres + redis | 1536M + 512M |
+| 애플리케이션 | svc-a + svc-b (backend + frontend) | 1024M + 192M + 768M + 192M |
+| 인프라/관측 | npm + vault + prometheus + grafana | 512M + 384M + 768M + 512M |
+| Exporters | node + postgres + redis | 128M × 3 |
+| **합계** | | **~12.6 GB** (시스템 예약 ~3.4 GB) |
 
 ## Architecture Overview
 
@@ -76,7 +95,8 @@ exit8/
 | PostgreSQL | 5432 | postgres:15-alpine | Database |
 | Redis | 6379 | redis:7-alpine | Cache |
 | Vault | 8200 | hashicorp/vault | Secrets Management |
-| Wazuh Dashboard | 5601 | - | SIEM Web UI (별도 실행) |
+| Wazuh Manager | 1514, 1515, 55000 | wazuh/wazuh-manager | SIEM Agent 수신 |
+| Wazuh Dashboard | 8443 → 5601 | wazuh/wazuh-dashboard | SIEM Web UI |
 | Prometheus | 9090 | prom/prometheus | Metrics Collector |
 | Grafana | 3001 | grafana/grafana | Visualization Dashboard |
 
@@ -95,15 +115,18 @@ docker exec -it vault vault login
 # Web UI: http://localhost:8200
 ```
 
-## Wazuh 실행 (선택)
+## Wazuh SIEM
+
+Wazuh는 메인 `docker-compose.yml`에 통합되어 있습니다. 별도 실행 불필요.
 
 ```bash
-# Wazuh는 리소스를 많이 사용하므로 별도 실행
-docker-compose -f services/wazuh/docker-compose.wazuh.yml up -d
+# 메인 docker-compose up -d 로 함께 기동됨
 
-# Dashboard: https://localhost:5601
+# Dashboard: https://localhost:8443
 # Login: admin / SecretPassword
 ```
+
+> **주의:** Wazuh 인증서 파일이 `services/wazuh/config/wazuh_indexer_ssl_certs/` 경로에 있어야 합니다.
 
 ## Observability
 
