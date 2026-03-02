@@ -3,6 +3,7 @@
   <!-- ===== Nginx 기반 (URL/쿼리스트링 패턴 매칭) ===== -->
   <rule id="100100" level="12">
     <if_sid>31103, 31106, 31110, 31151</if_sid>
+    <match type="pcre2">(?i)(union[\s\+]+select|'\s*(or|and)\b|--|/\*|\*/|sleep\(|benchmark\(|information_schema|%27\s*(or|and)\b)</match>
     <description>Critical: SQL Injection Attempt Detected!</description>
     <group>sql_injection_alert</group>
   </rule>
