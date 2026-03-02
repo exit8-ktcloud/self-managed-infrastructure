@@ -163,7 +163,7 @@
       "type": "timeseries",
       "targets": [
         {
-          "expr": "up",
+          "expr": "up{job!=\"nginx\"}",
           "legendFormat": "{{job}}",
           "refId": "A"
         }
