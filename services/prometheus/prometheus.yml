@@ -30,11 +30,6 @@ scrape_configs:
     static_configs:
       - targets: ['redis-exporter:9121']
 
-  # Nginx Proxy Manager
-  - job_name: 'nginx'
-    static_configs:
-      - targets: ['nginx-exporter:9113']
-
   # Node Exporter (Host metrics)
   - job_name: 'node'
     static_configs:
