@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY --chown=appuser:appgroup . ./
 
+RUN mkdir -p /var/log/service-b-backend && chown -R appuser:appgroup /var/log/service-b-backend
+
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
