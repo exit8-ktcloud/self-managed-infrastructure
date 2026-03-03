@@ -257,15 +257,18 @@ curl -X POST "http://localhost:8080/api/load/cpu?durationMs=1000" -H "X-Trace-Id
 ## 5. 테스트 불변식
 
 - CircuitBreaker 설정은 테스트 간 변경하지 않는다.
-- Redis TTL은 5분으로 고정한다.
+- Redis
+  - Caffeine TTL 300초
+  - Redis TTL 600초 (GCP 설정)
+  - redis-cache.ttl-seconds: 300 (docker 설정)
 - JMeter Thread / Delay 값은 테스트 단위로 고정한다.
 - Docker 자원(CPU/Mem 제한)은 테스트 간 변경하지 않는다.
 
 ### CircuitBreaker 실험 설정
 
-- slidingWindowSize: 20 (최근 20개 호출 기준)
+- slidingWindowSize: 50 (최근 25개 호출 기준)
 - failureRateThreshold: 50% (50% 이상 실패 or 느린 호출이면 OPEN)
-- slowCallDurationThreshold: 2s (2초 이상이면 slow call)
+- slowCallDurationThreshold: 3s (3초 이상이면 slow call)
 - slowCallRateThreshold: 50% (slow call 50% 이상 시 OPEN)
 - waitDurationInOpenState: 10s (OPEN 유지 10초)
 
