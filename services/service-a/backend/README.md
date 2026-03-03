@@ -77,7 +77,8 @@ services/service-a/backend/
 - trace_id 기반 요청 추적
 
 ### 실험 재현성 보장
-- CircuitBreaker 고정 설정
+- 실험 시 CircuitBreaker 설정은 테스트 단위로 고정하며,   
+  profile 간 변경은 문서에 명시한다.
 - Redis TTL 고정
 - Docker 자원 고정
 
@@ -112,11 +113,11 @@ services/service-a/backend/
 
 ### 캐시 계층 구조
 
-| 계층 | 기술 | 위치 | TTL | 용도 |
-|------|------|------|-----|------|
-| **L1** | Caffeine | JVM In-Memory | 60s | 핫 데이터, 빈번한 조회 |
-| **L2** | Redis (Memorystore) | GCP Private IP | 300s | 웜 데이터, 인스턴스 간 공유 |
-| **Source** | PostgreSQL (Cloud SQL) | GCP Private IP | - | 원본 데이터 |
+| 계층 | 기술 | 위치 | TTL  | 용도 |
+|------|------|------|------|------|
+| **L1** | Caffeine | JVM In-Memory | 300s | 핫 데이터, 빈번한 조회 |
+| **L2** | Redis (Memorystore) | GCP Private IP | 600s | 웜 데이터, 인스턴스 간 공유 |
+| **Source** | PostgreSQL (Cloud SQL) | GCP Private IP | -    | 원본 데이터 |
 
 ### 장애 시 동작
 

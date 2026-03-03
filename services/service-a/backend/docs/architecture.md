@@ -9,13 +9,13 @@ Client
   → TraceIdFilter
   → RateLimitFilter
   → Controller
-  → Service (AOP Proxy: CircuitBreaker / Timed)
-  → Repository
-  → Observability
+  → Service (AOP Proxy: CircuitBreaker)   # + (Timer/Timed는 적용 방식 확인 필요)
+  → Repository (JPA)
+  → Observability (Metrics / Logs / EventBuffer / Snapshot APIs)
 ```
 
 ### 설계 의도
-- 요청 식별(trace_id) → 차단 → 비즈니스 실행 → 보호 → 관측
+- 요청 식별(trace_id) → Filter 단계 차단 → 비즈니스 실행(Service) → Resilience 보호(CB) → 관측
 - 보호(CircuitBreaker)와 관측(Observability)을 비즈니스 로직과 분리
 - Service를 시스템 행위의 최소 단위로 정의
 
@@ -139,9 +139,9 @@ Controller = API Adapter
 ### Resilience Layer
 - Resilience4j CircuitBreaker
 - Service 메서드를 AOP Proxy로 감싸는 방식으로 적용
-- Repository 이후가 아니라 Service 진입 시점에서 호출을 보호
+- 보호 범위는 Service 호출 전체이며, 그 내부에서 **Cache/Repository 호출(DB 접근 포함)**이 수행된다.
 - OPEN 상태에서는 Service 호출 자체가 차단되며 CallNotPermittedException 발생
-- GlobalExceptionHandler에서 503 변환
+- `GlobalExceptionHandler`에서 503 변환
 - 보호 로직은 비즈니스 로직과 분리된다.
 
 ### Observability Layer
@@ -182,7 +182,8 @@ Controller = API Adapter
 - Read-Through Cache 기반 부하 분산 테스트
 - `/db-read` 전용
 - TTL 기반 자연 만료 전략 사용
-  - Redis TTL: 5분
+  - Docker 환경: redis-cache.ttl-seconds: 300 (5분)
+  - GCP 환경: Spring cache/redis TTL 또는 별도 설정에 따라 600s(예: spring.cache.redis.time-to-live: 600s)
 
 #### Key 네이밍 규칙
 ```
@@ -194,7 +195,7 @@ test:service-a-backend:spring:dummy-data-page:{pageIndex}-{size}
 - 모든 Key는 TTL 필수
 - 테스트용 Key는 test: prefix 사용
 - Redis 장애는 try-catch로 DB fallback 처리
-- Redis 지연으로 인한 메서드 실행 시간 증가 시 slow-call로 집계
+- Redis 지연으로 인한 메서드 실행 시간 증가 시 slow-call로 집계 (CB 기준)
 
 ---
 
@@ -248,29 +249,34 @@ test:service-a-backend:spring:dummy-data-page:{pageIndex}-{size}
 ```
 [Filter Layer]
   ├─ TraceIdFilter
-  ├─ RateLimitFilter  ← 이벤트 발생 지점 1
+  ├─ RateLimitFilter  ← 이벤트 발생 지점 1 (429)
 
-[Service Layer]
-  ├─ LoadScenarioService
-  ├─ Redis Cache (Read-Through)
+[Controller Layer]
+  └─ API Adapter
+
+[Service Layer]  ← CircuitBreaker(AOP)가 Service 호출 전체를 보호
+  ├─ LoadScenarioService (실험 제어)
+  ├─ DbUnitService (CB 집계 단위 / read-through cache 포함)
+  │    ├─ L1 Cache (Caffeine)
+  │    ├─ L2 Cache (Redis, enabled/disabled 토글)
+  │    └─ DB (Repository/JPA)
   ├─ SystemHealthService
-  ├─ CircuitBreakerTestService
+  └─ CircuitBreakerTestService
 
 [Resilience Layer]
-  ├─ Resilience4j CircuitBreaker (AOP Proxy)   ← 이벤트 발생 지점 2
+  └─ Resilience4j CircuitBreaker (AOP Proxy) ← 이벤트 발생 지점 2 (OPEN → CallNotPermitted)
 
 [Exception Layer]
-  ├─ GlobalExceptionHandler ← CallNotPermittedException을 503으로 변환
-  
+  └─ GlobalExceptionHandler (CallNotPermittedException → 503)
+ 
 [Observability Layer]
-  ├─ CacheMetrics (hit/miss/error)
   ├─ Micrometer Counter / Timer
-  ├─ RequestEventBuffer (in-memory ring buffer)
+  ├─ CacheMetrics (hit/miss/error)
+  └─ RequestEventBuffer (in-memory ring buffer)
 
 [API Layer]
   ├─ SystemSnapshot API
-  ├─ RecentRequests API
-  └─ RateLimit Toggle API
+  └─ RecentRequests API
 ```
 
 ### RateLimit
@@ -308,9 +314,10 @@ RateLimitFilter
   ↓
 Controller
   ↓
-Service (AOP Proxy: CircuitBreaker / Timed)
-     ├─ Redis (READ)
-     ├─ DB (READ / WRITE)
+Service  (CircuitBreaker가 Service 호출 전체를 보호)
+     ├─ L1 Cache (Caffeine)
+     ├─ L2 Cache (Redis)  # runtime toggle 가능
+     └─ DB (JPA Repository)
      ↓
 Repository
   ↓
