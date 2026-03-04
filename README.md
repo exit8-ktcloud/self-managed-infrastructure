@@ -421,6 +421,83 @@ exit8/
 - [GitHub Actions Secrets](docs/github-actions-secrets.md)
 - [배포 가이드](docs/deploy-gcp.md)
 
+## Trouble Shooting
+
+### Security (Wazuh)
+
+| 증상 | 원인 | 조치 |
+|------|------|------|
+| 통합 후 접속 불가 | `.env` API 키가 Dashboard·Manager와 불일치 (`#` → `!` 문자 오류) | `.env` 값 통일 |
+| 컨테이너 재시작 실패 | 기존 Wazuh 볼륨과 신규 설정 충돌 | 오류 볼륨만 선택 삭제 후 재빌드 |
+| 환경변수 무시됨 | `wazuh.yml` 바인드 마운트가 환경변수보다 우선 적용 | 마운트된 `wazuh.yml` 직접 수정 |
+
+```bash
+# 충돌 볼륨만 선택 삭제
+docker volume rm $(docker volume ls -q | grep -E "wazuh_api_configuration|wazuh-dashboard-config")
+```
+
+- 룰 충돌 방지: 조건 일치 시간 `120초 → 60초` 조정 (`timeframe="60"`)
+- 대시보드 알림 레벨: `10 → 3` (노이즈 감소, 실제 위협 가시성 향상)
+- `wazuh.manager`에 `depends_on: wazuh.indexer` 추가 → 초기 기동 순서 보장
+
+---
+
+### Backend-A (Java/Spring)
+
+| 증상 | 원인 | 조치 |
+|------|------|------|
+| Docker 빌드 실패 | Gradle Wrapper JAR가 `.gitignore`에 의해 미추적 | Wrapper 재생성 + Git 강제 추적 |
+| JMeter 결과 해석 혼선 | Concurrency와 Throughput 기준 혼용 | Throughput(RPS) 기준으로 판정 통일 |
+
+- `gradle/wrapper/**` 는 항상 추적되도록 `.gitignore` 표준화, PR 체크리스트에 포함 여부 항목 추가
+- CI에서 wrapper 기반 빌드 검증을 필수 단계로 고정
+- 부하 조건 → Concurrency로 설정 / 결과 판정 → Throughput(RPS)으로 통일
+
+---
+
+### Backend-B (Python/FastAPI)
+
+**① SQL Injection 정규표현식 오탐**
+
+정상 입력(`"O'Reilly"`, `"What's up"`)이 공격으로 탐지되어 Wazuh 알람 폭증 → 실제 공격 신호가 묻히는 문제 발생
+
+```python
+# Before — 모든 작은따옴표 탐지 (오탐 다수)
+re.compile("'", re.IGNORECASE)
+
+# After — SQL 문법적으로 의미 있는 패턴만 탐지
+re.compile("'\\s*(?:OR|AND)\\b", re.IGNORECASE)
+```
+
+**② Trace ID 불일치 (분산 추적 실패)**
+
+동일 요청인데 `auth.py` ↔ `middleware.py` 간 `trace_id` 상이 → 쿼리 성능 개선으로 근본 원인 제거
+
+**③ DB 스키마 변경 미반영**
+
+`User` 테이블 컬럼 추가 후 컨테이너 재시작해도 미적용 (`OperationalError: column does not exist`)
+→ Alembic 도입, 컨테이너 시작 시 자동 마이그레이션 실행
+
+---
+
+### Frontend (Load Balancer Timeout)
+
+**증상:** 부하 테스트 중 P95 응답시간이 35~68초까지 급등, 모니터링 화면이 멈추거나 결과가 비정상 출력
+**원인:** GCP LB `timeout_sec` 기본값 30초 → 백엔드 응답이 30초 초과 시 LB가 먼저 연결을 끊어 504 발생
+(JMeter는 백엔드 직접 호출이라 정상 200 수신, 프론트엔드만 LB 경유로 영향받음)
+
+```nginx
+# nginx.conf
+proxy_read_timeout 100s;
+proxy_connect_timeout 100s;
+proxy_send_timeout 100s;
+```
+
+- Terraform GLB `timeout_sec` 30 → **100초** 상향
+- Frontend Nginx `proxy_read_timeout` **100초** 로 상향 → LB ↔ Nginx ↔ Backend 타임아웃 값 일치
+
+---
+
 ## Migration History
 
 | Date | Change |

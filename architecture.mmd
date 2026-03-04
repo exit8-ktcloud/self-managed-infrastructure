@@ -1,140 +1,134 @@
-graph TD
-
-subgraph External["External"]
-    User((사용자))
-    GitHub((GitHub Actions))
-    DHub([Docker Hub])
-end
-
-subgraph GCP["GCP Project"]
-
-    subgraph Edge["인터넷 엣지"]
-        CloudArmor["Cloud Armor<br/>(WAF - 준비 중)"]
-        GLB["GCP Global HTTPS LB<br/>SSL 종료 + HTTP→HTTPS 리디렉션"]
-    end
-
-    subgraph VPC["exit8-vpc / Subnet 10.0.0.0/24"]
-
-        subgraph VM["GCE VM: exit8-vm (e2-standard-4 · 4vCPU · 16GB · Ubuntu 22.04)"]
-
-            subgraph PUB["퍼블릭 레이어"]
-                NPM["Nginx Proxy Manager<br/>:80 / :443 / :81"]
-            end
-
-            subgraph APP["애플리케이션 레이어"]
-                FE1["Frontend A<br/>React / Nginx :3000"]
-                BE1["Backend A<br/>Spring Boot :8080"]
-                FE2["Frontend B<br/>React / Nginx :3002"]
-                BE2["Backend B<br/>FastAPI :8000"]
-            end
-
-            subgraph SEC["보안 레이어 — Wazuh SIEM 4.9"]
-                WM["Wazuh Manager<br/>:1514 / :1515 / :55000"]
-                WI["Wazuh Indexer<br/>OpenSearch :9200"]
-                WD["Wazuh Dashboard<br/>:8443"]
-            end
-
-            subgraph OBS["관측 레이어"]
-                Prom["Prometheus :9090"]
-                Grafana["Grafana :3001"]
-                NodeExp["Node Exporter"]
-                PGExp["Postgres Exporter"]
-                RedisExp["Redis Exporter"]
-            end
-
-        end
-
-        subgraph PSA["PSA — Private Service Access (프라이빗)"]
-            CloudSQL[("Cloud SQL<br/>PostgreSQL 15<br/>10.101.0.3:5432")]
-            Memstore[("Memorystore<br/>Redis 7.0 · 1 GB<br/>10.101.1.3:6379")]
-        end
-
-        CloudNAT["Cloud Router + NAT<br/>(아웃바운드 인터넷)"]
-
-    end
-
-    subgraph Platform["GCP 플랫폼 서비스"]
-        SecMgr["Secret Manager<br/>exit8-db-password"]
-        CloudMon["Cloud Monitoring<br/>+ Alert Policies"]
-        BQ[("BigQuery<br/>exit8_logs")]
-    end
-
-end
-
-%% 외부 트래픽
-User -->|"HTTPS / HTTP"| GLB
-CloudArmor -. "WAF 필터링" .-> GLB
-GLB --> NPM
-
-%% NPM 내부 라우팅
-NPM -->|"서비스 A 프론트"| FE1
-NPM -->|"/api/v1"| BE1
-NPM -->|"서비스 B 프론트"| FE2
-NPM -->|"/api/v2"| BE2
-FE1 -.->|"API 호출"| BE1
-FE2 -.->|"API 호출"| BE2
-
-%% 애플리케이션 → 데이터
-BE1 --> CloudSQL
-BE2 --> CloudSQL
-BE1 --> Memstore
-BE2 --> Memstore
-
-%% Wazuh 내부 연결
-WM --> WI
-WD --> WI
-WD --> WM
-WM -. "로그 수집" .-> FE1
-WM -. "로그 수집" .-> FE2
-WM -. "로그 수집" .-> BE1
-WM -. "로그 수집" .-> BE2
-
-%% 관측 연결
-Prom -. "메트릭 스크레이프" .-> BE1
-Prom -. "메트릭 스크레이프" .-> BE2
-Prom --> NodeExp
-Prom --> PGExp
-Prom --> RedisExp
-PGExp -. "메트릭" .-> CloudSQL
-RedisExp -. "메트릭" .-> Memstore
-Grafana --> Prom
-
-%% GCP 플랫폼 연결
-CloudSQL -. "로그 싱크" .-> BQ
-CloudMon -. "모니터링" .-> GLB
-CloudMon -. "모니터링" .-> CloudSQL
-CloudMon -. "모니터링" .-> Memstore
-SecMgr -. "DB 패스워드 주입" .-> BE1
-SecMgr -. "DB 패스워드 주입" .-> BE2
-
-%% PSA 아웃바운드
-VM -. "Private IP" .-> PSA
-CloudNAT -. "아웃바운드" .-> External
-
-%% CI/CD 파이프라인
-GitHub -->|"1. 이미지 빌드 & Push"| DHub
-DHub -. "2. docker pull" .-> VM
-GitHub -->|"3. SSH + git pull + compose up"| VM
-
-%% 스타일 (에러 방지를 위해 color 값과 세미콜론 확인)
-style User fill:#f9f,stroke:#333,stroke-width:2px;
-style GitHub fill:#24292e,color:#fff;
-style DHub fill:#066da5,color:#fff;
-style GLB fill:#4285f4,color:#fff;
-style CloudArmor fill:#ea4335,color:#fff;
-style NPM fill:#009639,color:#fff;
-style FE1 fill:#00d8ff,color:#333;
-style FE2 fill:#00d8ff,color:#333;
-style BE1 fill:#6db33f,color:#fff;
-style BE2 fill:#009485,color:#fff;
-style WM fill:#00a9e0,color:#fff;
-style WI fill:#00a9e0,color:#fff;
-style WD fill:#00a9e0,color:#fff;
-style Prom fill:#e6522c,color:#fff;
-style Grafana fill:#f39c12,color:#fff;
-style CloudSQL fill:#336791,color:#fff;
-style Memstore fill:#dc382d,color:#fff;
-style SecMgr fill:#fbbc04,color:#333;
-style CloudMon fill:#34a853,color:#fff;
-style BQ fill:#4285f4,color:#fff;
-style CloudNAT fill:#34a853,color:#fff;
+ %%{init: {"flowchart": {"curve": "step", "rankSpacing": 150, "nodeSpacing":80}}}%%
+  graph TD
+  subgraph External["External"]
+      User((사용자))
+      GitHub((GitHub Actions))
+      DHub([Docker Hub])
+  end
+  subgraph GCP["GCP Project"]
+      subgraph Platform["GCP 플랫폼 서비스"]
+          SecMgr["Secret Manager<br/>db / grafana / wazuh"]
+          CloudMon["Cloud Monitoring<br/>+ Alert Policies"]
+          BQ[("GCS<br/>Log Store")]
+      end
+      subgraph VPC["exit8-vpc / Subnet 10.0.0.0/24"]
+          subgraph Edge["인터넷 엣지"]
+              GLB["GCP Global HTTPS LB<br/>SSL 종료 + HTTP→HTTPS 리디렉션"]
+              CloudArmor["Cloud Armor<br/>(WAF - 승인 대기 중)"]
+          end
+          subgraph VM["GCE VM: exit8-vm (e2-standard-4 · 4vCPU · 16GB · Ubuntu 22.04)"]
+              subgraph PUB["퍼블릭 레이어"]
+                  NPM["Nginx Proxy Manager<br/>:80 / :443 / :81 / :8081"]
+              end
+              subgraph APP["애플리케이션 레이어"]
+                  FE1["Frontend A<br/>React / Nginx :3000"]
+                  BE1["Backend A<br/>Spring Boot :8080"]
+                  FE2["Frontend B<br/>React / Nginx :3002"]
+                  BE2["Backend B<br/>FastAPI :8000"]
+              end
+              subgraph SEC["보안 레이어 — Wazuh SIEM 4.9"]
+                  WM["Wazuh Manager<br/>:1514 / :1515 / :514/udp / :55000"]
+                  WI["Wazuh Indexer<br/>OpenSearch :9200"]
+                  WD["Wazuh Dashboard<br/>:8443"]
+              end
+              subgraph OBS["관측 레이어"]
+                  Prom["Prometheus :9090"]
+                  Grafana["Grafana :3001"]
+                  NodeExp["Node Exporter"]
+                  PGExp["Postgres Exporter"]
+                  RedisExp["Redis Exporter"]
+              end
+          end
+          subgraph PSA["PSA — Private Service Access (프라이빗)"]
+              CloudSQL[("Cloud SQL<br/>PostgreSQL 15<br/>10.101.0.3:5432")]
+              Memstore[("Memorystore<br/>Redis 7.0 · 1GB<br/>10.101.1.3:6379")]
+          end
+          CloudNAT["Cloud Router + NAT<br/>(PSA 아웃바운드)"]
+      end
+  end
+  %% 외부 트래픽
+  User -->|"HTTPS / HTTP"| GLB
+  GLB --> CloudArmor
+  CloudArmor -. "WAF 필터링" .-> NPM
+  %% NPM 내부 라우팅
+  NPM -->|"서비스 A 프론트"| FE1
+  NPM -->|"/api/v1"| BE1
+  NPM -->|"서비스 B 프론트"| FE2
+  NPM -->|"/api/v2"| BE2
+  FE1 -.->|"API 호출"| BE1
+  FE2 -.->|"API 호출"| BE2
+  %% 애플리케이션 → 데이터
+  BE1 --> CloudSQL
+  BE2 --> CloudSQL
+  BE1 --> Memstore
+  BE2 --> Memstore
+  %% Wazuh 내부 연결
+  WM --> WI
+  WD --> WI
+  WD --> WM
+  WM -. "nginx 로그 수집" .-> FE1
+  WM -. "nginx 로그 수집" .-> FE2
+  %% 앱 백엔드 로그 → GCS (gcplogs driver)
+  BE1 -. "gcplogs" .-> BQ
+  BE2 -. "gcplogs" .-> BQ
+  %% 관측 연결
+  Prom -. "메트릭 스크레이프" .-> BE1
+  Prom -. "메트릭 스크레이프" .-> BE2
+  Prom --> NodeExp
+  Prom --> PGExp
+  Prom --> RedisExp
+  PGExp -. "메트릭" .-> CloudSQL
+  RedisExp -. "메트릭" .-> Memstore
+  Grafana --> Prom
+  %% GCP 플랫폼 연결
+  CloudSQL -. "로그 싱크" .-> BQ
+  CloudMon -. "모니터링" .-> GLB
+  CloudMon -. "모니터링" .-> CloudSQL
+  CloudMon -. "모니터링" .-> Memstore
+  SecMgr -. "DB 패스워드 주입" .-> BE1
+  SecMgr -. "DB 패스워드 주입" .-> BE2
+  SecMgr -. "패스워드 주입" .-> Grafana
+  SecMgr -. "패스워드 주입" .-> WM
+  %% PSA 아웃바운드
+  VM -. "Private IP" .-> PSA
+  CloudNAT -. "아웃바운드" .-> External
+  %% CI/CD 파이프라인
+  GitHub -->|"1. 이미지 빌드 & Push"| DHub
+  DHub -. "2. docker pull" .-> VM
+  GitHub -->|"3. SSH + git pull + compose up"| VM
+  %% 영역별 테두리 스타일 설정 (최종 보정)
+  style Platform fill:none,stroke:#4285F4,stroke-width:3px,stroke-dasharray: 5
+  5;
+  style VPC fill:none,stroke:#34A853,stroke-width:3px;
+  style VM fill:none,stroke:#FBBC04,stroke-width:3px;
+  %% 요청하신 영역 테두리 스타일
+  style Edge fill:none,stroke:#EA4335,stroke-width:3px,stroke-dasharray: 5 5;
+  style PSA fill:none,stroke:#EA4335,stroke-width:3px,stroke-dasharray: 5 5;
+  style PUB fill:none,stroke:#f39c12,stroke-width:3px;
+  style APP fill:none,stroke:#f39c12,stroke-width:3px;
+  style SEC fill:none,stroke:#f39c12,stroke-width:3px;
+  style OBS fill:none,stroke:#f39c12,stroke-width:3px;
+  %% 개별 서비스 스타일
+  style User fill:#f9f,stroke:#333,stroke-width:2px;
+  style GitHub fill:#24292e,color:#fff;
+  style DHub fill:#066da5,color:#fff;
+  style GLB fill:#4285f4,color:#fff;
+  style CloudArmor fill:#ea4335,color:#fff;
+  style NPM fill:#009639,color:#fff;
+  style FE1 fill:#00d8ff,color:#333;
+  style FE2 fill:#00d8ff,color:#333;
+  style BE1 fill:#6db33f,color:#fff;
+  style BE2 fill:#009485,color:#fff;
+  style WM fill:#00a9e0,color:#fff;
+  style WI fill:#00a9e0,color:#fff;
+  style WD fill:#00a9e0,color:#fff;
+  style Prom fill:#e6522c,color:#fff;
+  style Grafana fill:#f39c12,color:#fff;
+  style CloudSQL fill:#336791,color:#fff;
+  style Memstore fill:#dc382d,color:#fff;
+  style SecMgr fill:#fbbc04,color:#333;
+  style CloudMon fill:#34a853,color:#fff;
+  style BQ fill:#4285f4,color:#fff;
+  style CloudNAT fill:#34a853,color:#fff;
+  %% 연결선 애니메이션 효과 (모든 연결선에 점선 & 애니메이션 적용)
+  linkStyle default stroke-width:2px, fill:none, stroke-dasharray: 5 5, animation: dash 1s linear infinite;
